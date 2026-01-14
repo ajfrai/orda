@@ -10,6 +10,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,6 +28,18 @@ export default function Home() {
       }
       setSelectedFile(file);
       setErrorDetails(null);
+    }
+  };
+
+  const handleCopyError = async () => {
+    if (!errorDetails) return;
+
+    try {
+      await navigator.clipboard.writeText(errorDetails);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -177,12 +190,20 @@ Request details:
                   <pre className="text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono overflow-x-auto">
                     {errorDetails}
                   </pre>
-                  <button
-                    onClick={() => setErrorDetails(null)}
-                    className="mt-3 text-xs text-red-600 dark:text-red-400 hover:underline"
-                  >
-                    Dismiss
-                  </button>
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      onClick={handleCopyError}
+                      className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      {isCopied ? '✓ Copied!' : 'Copy'}
+                    </button>
+                    <button
+                      onClick={() => setErrorDetails(null)}
+                      className="text-xs text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
