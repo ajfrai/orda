@@ -111,6 +111,7 @@ async function fetchFileAsBase64(url: string): Promise<FileData> {
  * Core function to analyze menu data with Claude
  */
 async function analyzeMenuWithClaude(fileData: FileData): Promise<MenuAnalysisResult> {
+  let jsonText = ''; // Declare outside try to access in catch
   try {
     // Build content array based on file type
     const contentArray: any[] = fileData.isDocument
@@ -207,7 +208,7 @@ IMPORTANT: Respond with ONLY the JSON object, no other text.`,
     }
 
     // Extract JSON from response (handle potential markdown code blocks)
-    let jsonText = textContent.text.trim();
+    jsonText = textContent.text.trim();
 
     // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
@@ -218,9 +219,16 @@ IMPORTANT: Respond with ONLY the JSON object, no other text.`,
 
     const result = JSON.parse(jsonText) as MenuAnalysisResult;
 
+    console.log('[DEBUG] Claude analysis complete, isMenu:', result.isMenu);
+    if (result.isMenu) {
+      console.log('[DEBUG] Restaurant:', result.restaurantName);
+      console.log('[DEBUG] Categories:', result.categories?.length);
+    }
+
     return result;
   } catch (error) {
     console.error('Error analyzing menu PDF:', error);
+    console.error('[DEBUG] Raw response text:', jsonText);
 
     if (error instanceof Error) {
       return {

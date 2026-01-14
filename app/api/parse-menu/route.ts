@@ -106,6 +106,9 @@ export async function POST(request: NextRequest) {
     const taxRate = getTaxRate(analysis.location?.state);
     console.log(`Tax rate for ${analysis.location?.state || 'unknown'}: ${taxRate}`);
 
+    // Log analysis result for debugging
+    console.log('[DEBUG] Analysis result:', JSON.stringify(analysis, null, 2));
+
     // Flatten categories into items array for storage
     const menuItems = analysis.categories.flatMap((category) =>
       category.items.map((item) => ({
@@ -125,6 +128,10 @@ export async function POST(request: NextRequest) {
     // Get Supabase service role client
     const supabase = getServiceRoleClient();
 
+    // Log what we're about to insert
+    console.log('[DEBUG] Inserting menu with items count:', menuItems.length);
+    console.log('[DEBUG] First menu item sample:', JSON.stringify(menuItems[0], null, 2));
+
     // Create menu record in Supabase
     const { data: menu, error: menuError } = await supabase
       .from('menus')
@@ -142,7 +149,19 @@ export async function POST(request: NextRequest) {
     if (menuError) {
       console.error('Error creating menu:', menuError);
       return NextResponse.json(
-        { error: 'Failed to save menu data' },
+        {
+          error: 'Failed to save menu data',
+          details: {
+            message: menuError.message,
+            code: menuError.code,
+            hint: menuError.hint,
+            details: menuError.details,
+            supabaseError: menuError,
+            restaurantName: analysis.restaurantName,
+            itemsCount: menuItems.length,
+            sampleItem: menuItems[0],
+          }
+        },
         { status: 500 }
       );
     }
@@ -160,7 +179,17 @@ export async function POST(request: NextRequest) {
     if (cartError) {
       console.error('Error creating cart:', cartError);
       return NextResponse.json(
-        { error: 'Failed to create cart' },
+        {
+          error: 'Failed to create cart',
+          details: {
+            message: cartError.message,
+            code: cartError.code,
+            hint: cartError.hint,
+            details: cartError.details,
+            supabaseError: cartError,
+            menuId: menu.id,
+          }
+        },
         { status: 500 }
       );
     }
@@ -175,8 +204,17 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in parse-menu:', error);
 
+    const errorDetails = error instanceof Error ? {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+    } : { error: String(error) };
+
     return NextResponse.json(
-      { error: 'An unexpected error occurred while processing the menu' },
+      {
+        error: 'An unexpected error occurred while processing the menu',
+        details: errorDetails
+      },
       { status: 500 }
     );
   }
@@ -352,7 +390,15 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
 
         if (menuError) {
           console.error('Error creating menu:', menuError);
-          sendEvent('error', { error: 'Failed to save menu data' });
+          sendEvent('error', {
+            error: 'Failed to save menu data',
+            details: {
+              message: menuError.message,
+              code: menuError.code,
+              hint: menuError.hint,
+              details: menuError.details,
+            }
+          });
           controller.close();
           return;
         }
@@ -368,7 +414,15 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
 
         if (cartError) {
           console.error('Error creating cart:', cartError);
-          sendEvent('error', { error: 'Failed to create cart' });
+          sendEvent('error', {
+            error: 'Failed to create cart',
+            details: {
+              message: cartError.message,
+              code: cartError.code,
+              hint: cartError.hint,
+              details: cartError.details,
+            }
+          });
           controller.close();
           return;
         }
@@ -383,7 +437,16 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
       } catch (error) {
         console.error('Error in streaming request:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
-        const message = `event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`;
+        const errorDetails = error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        } : { error: String(error) };
+
+        const message = `event: error\ndata: ${JSON.stringify({
+          error: errorMessage,
+          details: errorDetails
+        })}\n\n`;
         controller.enqueue(encoder.encode(message));
         controller.close();
       }
