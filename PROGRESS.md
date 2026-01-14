@@ -141,11 +141,17 @@ Required in `.env.local` and Vercel:
   - Displays restaurant info, location, and tax rate
   - Shows current cart items if any exist
   - Loading states and error handling
+  - **Bug fix**: Cart API was incorrectly querying non-existent `menu_items` table; fixed to read items from `menus.items` JSONB column as per schema
 
 ### Key Accomplishments (Session 3)
 - Full menu parsing pipeline working (PDF/image upload → Claude analysis → database storage)
 - Support for both file uploads and URL-based menus
-- Streaming progress indicators during Claude API calls
+- Streaming progress indicators during Claude API calls (backend SSE infrastructure ready)
 - Comprehensive error logging for debugging
 - Database constraint fix for uploaded files
 - Working cart page to verify parsed menu data
+
+### Known Issues / Pending Work
+- Streaming progress UI not yet implemented on frontend (backend SSE ready, needs frontend EventSource integration)
+- Debug error display needs to be removed before production (tracked in .github/ISSUE_TEMPLATE.md)
+- Need to implement remaining cart functionality (add items, update quantities, tip calculation)
