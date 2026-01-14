@@ -17,7 +17,7 @@ export interface MenuItem {
 export interface Menu {
   id: string;
   created_at: string;
-  pdf_url: string;
+  pdf_url: string | null;
   restaurant_name: string;
   location: {
     city: string;
