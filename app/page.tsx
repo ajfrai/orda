@@ -11,6 +11,11 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [progressStages, setProgressStages] = useState({
+    downloading: false,
+    parsing: false,
+    streaming: false,
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,6 +52,7 @@ export default function Home() {
     e.preventDefault();
     setIsLoading(true);
     setErrorDetails(null);
+    setProgressStages({ downloading: false, parsing: false, streaming: false });
 
     try {
       let body: any;
@@ -89,15 +95,15 @@ export default function Home() {
         // Provide more helpful error message for common cases
         if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
           throw new Error(
-            `Network request failed. This could be due to:\n` +
-            `• CORS restrictions on the PDF URL\n` +
-            `• The PDF URL is not publicly accessible\n` +
+            `Network request failed. This is usually temporary and could be:\n` +
+            `• Rate limiting by the server (too many requests)\n` +
             `• Network connectivity issues\n` +
-            `• The server blocking the request\n\n` +
+            `• Server temporarily unavailable\n` +
+            `• Request timeout\n\n` +
             `Try:\n` +
-            `• Using a different PDF URL\n` +
-            `• Uploading the file directly instead\n` +
-            `• Checking if the URL is publicly accessible in your browser`
+            `• Wait a minute and try again\n` +
+            `• Upload the file directly instead\n` +
+            `• Check if the URL still works in your browser`
           );
         }
 
@@ -167,9 +173,29 @@ export default function Home() {
               throw new Error(data.error);
             }
 
+            // Update progress stages based on status messages
+            if (data.message) {
+              const msg = data.message.toLowerCase();
+
+              if (msg.includes('fetching') || msg.includes('retrying')) {
+                // Downloading from URL
+                setProgressStages(prev => ({ ...prev, downloading: false, parsing: false, streaming: false }));
+              } else if (msg.includes('preparing') || msg.includes('sending to claude') || msg.includes('analyzing')) {
+                // For uploads, skip downloading stage; for URLs, mark downloading complete
+                setProgressStages(prev => ({ downloading: true, parsing: false, streaming: false }));
+              } else if (msg.includes('parsing results')) {
+                // Parsing complete
+                setProgressStages(prev => ({ downloading: true, parsing: true, streaming: false }));
+              } else if (msg.includes('creating cart') || msg.includes('finalizing')) {
+                // Creating cart
+                setProgressStages({ downloading: true, parsing: true, streaming: true });
+              }
+            }
+
             // Navigate on first item
             if (data.cartId && !window.location.pathname.includes('/cart/')) {
               console.log('[DEBUG] First item received, navigating to cart:', data.cartId);
+              setProgressStages({ downloading: true, parsing: true, streaming: true });
               window.location.href = `/cart/${data.cartId}?streaming=true`;
               return; // Stop processing
             }
@@ -364,12 +390,56 @@ Request details:
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Creating Cart...
+                  Processing...
                 </span>
               ) : (
                 'Create Cart'
               )}
             </button>
+
+            {isLoading && (
+              <div className="mt-4 space-y-2 text-sm">
+                <div className={`flex items-center gap-2 transition-all ${progressStages.downloading ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {progressStages.downloading ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  <span>Downloading menu</span>
+                </div>
+                <div className={`flex items-center gap-2 transition-all ${progressStages.parsing ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {progressStages.parsing ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  <span>Parsing with AI</span>
+                </div>
+                <div className={`flex items-center gap-2 transition-all ${progressStages.streaming ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                  {progressStages.streaming ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  )}
+                  <span>Creating cart</span>
+                </div>
+              </div>
+            )}
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
