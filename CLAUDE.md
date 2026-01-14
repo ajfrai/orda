@@ -2,13 +2,15 @@
 
 This file contains instructions for Claude Code when working on the Orda project.
 
-## Before Starting Any Work
+## At the Start of Each Session
 
-**ALWAYS read `PROGRESS.md` first** to understand:
+**Read `PROGRESS.md` once at the beginning** to understand:
 - Current project status
 - What's already been completed
 - What's next in the build order
 - Recent session history
+
+No need to re-read it during the session unless specifically asked.
 
 ## Git Workflow
 
