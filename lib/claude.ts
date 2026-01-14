@@ -186,7 +186,10 @@ If it is NOT a restaurant menu, respond with:
   "error": "This PDF does not appear to be a restaurant menu."
 }
 
-IMPORTANT: Respond with ONLY the JSON object, no other text.`,
+IMPORTANT:
+- Respond with ONLY the JSON object, no other text
+- Ensure all strings are properly escaped (use \\" for quotes within strings, \\n for newlines)
+- The JSON must be valid and parseable`,
     });
 
     // Call Claude API
@@ -212,12 +215,24 @@ IMPORTANT: Respond with ONLY the JSON object, no other text.`,
 
     // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json\n/, '').replace(/\n```$/, '');
+      jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```\n/, '').replace(/\n```$/, '');
+      jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
 
-    const result = JSON.parse(jsonText) as MenuAnalysisResult;
+    // Try to parse JSON with better error handling
+    let result: MenuAnalysisResult;
+    try {
+      result = JSON.parse(jsonText) as MenuAnalysisResult;
+    } catch (parseError) {
+      // If JSON parsing fails, provide detailed error info
+      const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
+      console.error('[DEBUG] JSON parse failed:', errorMsg);
+      console.error('[DEBUG] Problematic JSON text (first 500 chars):', jsonText.substring(0, 500));
+      console.error('[DEBUG] Problematic JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)));
+
+      throw new Error(`JSON parsing failed: ${errorMsg}. This may be due to malformed JSON in Claude's response. Check the debug logs for the raw response.`);
+    }
 
     console.log('[DEBUG] Claude analysis complete, isMenu:', result.isMenu);
     if (result.isMenu) {
@@ -395,7 +410,10 @@ If it is NOT a restaurant menu, respond with:
   "error": "This PDF does not appear to be a restaurant menu."
 }
 
-IMPORTANT: Respond with ONLY the JSON object, no other text.`,
+IMPORTANT:
+- Respond with ONLY the JSON object, no other text
+- Ensure all strings are properly escaped (use \\" for quotes within strings, \\n for newlines)
+- The JSON must be valid and parseable`,
     });
 
     onProgress({ type: 'status', message: 'Sending to Claude AI...' });
@@ -441,12 +459,24 @@ IMPORTANT: Respond with ONLY the JSON object, no other text.`,
 
     // Remove markdown code blocks if present
     if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json\n/, '').replace(/\n```$/, '');
+      jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
     } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```\n/, '').replace(/\n```$/, '');
+      jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
 
-    const result = JSON.parse(jsonText) as MenuAnalysisResult;
+    // Try to parse JSON with better error handling
+    let result: MenuAnalysisResult;
+    try {
+      result = JSON.parse(jsonText) as MenuAnalysisResult;
+    } catch (parseError) {
+      // If JSON parsing fails, provide detailed error info
+      const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
+      console.error('[DEBUG] JSON parse failed:', errorMsg);
+      console.error('[DEBUG] Problematic JSON text (first 500 chars):', jsonText.substring(0, 500));
+      console.error('[DEBUG] Problematic JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)));
+
+      throw new Error(`JSON parsing failed: ${errorMsg}. This may be due to malformed JSON in Claude's response. Check the debug logs for the raw response.`);
+    }
 
     onProgress({ type: 'complete', result });
 
