@@ -31,10 +31,16 @@ export interface MenuItem {
   isEstimate: boolean;
 }
 
+interface FileData {
+  base64: string;
+  mediaType: string;
+  isDocument: boolean; // true for PDF, false for images
+}
+
 /**
- * Fetch PDF from URL and return as base64
+ * Fetch file (PDF or image) from URL and return as base64 with media type
  */
-async function fetchPdfAsBase64(url: string): Promise<string> {
+async function fetchFileAsBase64(url: string): Promise<FileData> {
   const response = await fetch(url, {
     headers: {
       'User-Agent': 'Orda-Menu-Parser/1.0',
@@ -43,56 +49,91 @@ async function fetchPdfAsBase64(url: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
-  }
-
-  // Check content type
-  const contentType = response.headers.get('content-type');
-  if (contentType && !contentType.includes('pdf')) {
-    console.warn(`Warning: Content-Type is "${contentType}", expected PDF`);
+    throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
   }
 
   // Check file size (10MB limit)
   const contentLength = response.headers.get('content-length');
   if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) {
-    throw new Error('PDF file is too large (max 10MB)');
+    throw new Error('File is too large (max 10MB)');
+  }
+
+  // Detect content type
+  const contentType = response.headers.get('content-type') || '';
+  let mediaType = contentType;
+  let isDocument = false;
+
+  // Map content types
+  if (contentType.includes('pdf')) {
+    mediaType = 'application/pdf';
+    isDocument = true;
+  } else if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+    mediaType = 'image/jpeg';
+  } else if (contentType.includes('png')) {
+    mediaType = 'image/png';
+  } else if (contentType.includes('gif')) {
+    mediaType = 'image/gif';
+  } else if (contentType.includes('webp')) {
+    mediaType = 'image/webp';
+  } else {
+    // Fallback: detect from URL extension
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('.pdf')) {
+      mediaType = 'application/pdf';
+      isDocument = true;
+    } else if (urlLower.includes('.jpg') || urlLower.includes('.jpeg')) {
+      mediaType = 'image/jpeg';
+    } else if (urlLower.includes('.png')) {
+      mediaType = 'image/png';
+    } else if (urlLower.includes('.gif')) {
+      mediaType = 'image/gif';
+    } else if (urlLower.includes('.webp')) {
+      mediaType = 'image/webp';
+    }
   }
 
   const arrayBuffer = await response.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 
-  return buffer.toString('base64');
+  return {
+    base64: buffer.toString('base64'),
+    mediaType,
+    isDocument,
+  };
 }
 
 /**
- * Analyze a PDF menu using Claude's vision API
- * @param pdfUrl - URL to the PDF menu
- * @returns Menu analysis result
+ * Core function to analyze menu data with Claude
  */
-export async function analyzeMenuPdf(pdfUrl: string): Promise<MenuAnalysisResult> {
+async function analyzeMenuWithClaude(fileData: FileData): Promise<MenuAnalysisResult> {
   try {
-    // Fetch PDF as base64
-    const pdfBase64 = await fetchPdfAsBase64(pdfUrl);
-
-    // Call Claude API with PDF
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBase64,
-              },
+    // Build content array based on file type
+    const contentArray: any[] = fileData.isDocument
+      ? [
+          {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: fileData.mediaType,
+              data: fileData.base64,
             },
-            {
-              type: 'text',
-              text: `Please analyze this PDF and determine if it's a restaurant menu.
+          },
+        ]
+      : [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: fileData.mediaType,
+              data: fileData.base64,
+            },
+          },
+        ];
+
+    // Add text prompt
+    contentArray.push({
+      type: 'text',
+      text: `Please analyze this ${fileData.isDocument ? 'PDF' : 'image'} and determine if it's a restaurant menu.
 
 If it IS a restaurant menu, extract the following information and respond with valid JSON:
 {
@@ -127,8 +168,16 @@ If it is NOT a restaurant menu, respond with:
 }
 
 IMPORTANT: Respond with ONLY the JSON object, no other text.`,
-            },
-          ],
+    });
+
+    // Call Claude API
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: contentArray,
         },
       ],
     });
@@ -164,7 +213,64 @@ IMPORTANT: Respond with ONLY the JSON object, no other text.`,
 
     return {
       isMenu: false,
-      error: 'Failed to analyze PDF',
+      error: 'Failed to analyze menu',
     };
+  }
+}
+
+/**
+ * Analyze a menu from URL (PDF or image)
+ * @param fileUrl - URL to the menu file
+ * @returns Menu analysis result
+ */
+export async function analyzeMenuPdf(fileUrl: string): Promise<MenuAnalysisResult> {
+  try {
+    const fileData = await fetchFileAsBase64(fileUrl);
+    return await analyzeMenuWithClaude(fileData);
+  } catch (error) {
+    console.error('Error fetching menu from URL:', error);
+    if (error instanceof Error) {
+      return { isMenu: false, error: error.message };
+    }
+    return { isMenu: false, error: 'Failed to fetch menu from URL' };
+  }
+}
+
+/**
+ * Analyze a menu from uploaded file
+ * @param buffer - File buffer
+ * @param mimeType - MIME type of the file
+ * @returns Menu analysis result
+ */
+export async function analyzeMenuFromUpload(
+  buffer: Buffer,
+  mimeType: string
+): Promise<MenuAnalysisResult> {
+  try {
+    // Determine if it's a document or image
+    let mediaType = mimeType;
+    let isDocument = false;
+
+    if (mimeType === 'application/pdf') {
+      isDocument = true;
+    } else if (mimeType.startsWith('image/')) {
+      mediaType = mimeType;
+    } else {
+      throw new Error('Unsupported file type');
+    }
+
+    const fileData: FileData = {
+      base64: buffer.toString('base64'),
+      mediaType,
+      isDocument,
+    };
+
+    return await analyzeMenuWithClaude(fileData);
+  } catch (error) {
+    console.error('Error analyzing uploaded menu:', error);
+    if (error instanceof Error) {
+      return { isMenu: false, error: error.message };
+    }
+    return { isMenu: false, error: 'Failed to analyze uploaded file' };
   }
 }
