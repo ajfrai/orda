@@ -23,7 +23,7 @@ export async function GET(
       );
     }
 
-    // Fetch menu with items
+    // Fetch menu with items (items are stored as JSONB in the menus table)
     const { data: menu, error: menuError } = await supabase
       .from('menus')
       .select('*')
@@ -34,21 +34,6 @@ export async function GET(
       return NextResponse.json(
         { error: 'Menu not found', details: menuError },
         { status: 404 }
-      );
-    }
-
-    // Fetch menu items
-    const { data: menuItems, error: itemsError } = await supabase
-      .from('menu_items')
-      .select('*')
-      .eq('menu_id', menu.id)
-      .order('category', { ascending: true })
-      .order('name', { ascending: true });
-
-    if (itemsError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch menu items', details: itemsError },
-        { status: 500 }
       );
     }
 
@@ -66,12 +51,23 @@ export async function GET(
       );
     }
 
+    // Transform the menu data to match our expected format
+    const menuData = {
+      id: menu.id,
+      created_at: menu.created_at,
+      pdf_url: menu.pdf_url,
+      restaurant_name: menu.restaurant_name,
+      location: {
+        city: menu.location_city || 'Unknown',
+        state: menu.location_state || 'Unknown',
+      },
+      tax_rate: menu.tax_rate,
+      items: Array.isArray(menu.items) ? menu.items : [],
+    };
+
     return NextResponse.json({
       cart,
-      menu: {
-        ...menu,
-        items: menuItems || [],
-      },
+      menu: menuData,
       cartItems: cartItems || [],
     });
   } catch (error) {
