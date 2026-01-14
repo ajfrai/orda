@@ -14,13 +14,15 @@ No need to re-read it during the session unless specifically asked.
 
 ## Git Workflow
 
-**Push directly to `main` branch** - no PRs needed.
+**Push directly to `claude/main` branch** - no PRs needed.
 
 This is a hobby project with just two collaborators (human + AI), so we skip the PR process:
-- Develop on `main` branch
+- Develop on `claude/main` branch
 - Commit frequently with clear messages
-- Push directly to `main` after commits
+- Push directly to `claude/main` after commits
 - No need to create feature branches or pull requests
+
+Branch naming: Use `claude/main` as the primary branch (allows AI assistant to push directly)
 
 ## Development Practices
 
