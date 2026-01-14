@@ -102,3 +102,50 @@ Required in `.env.local` and Vercel:
   - Implemented helper functions (getCartWithData, subscribeToCartItems)
   - Created comprehensive test script with setup guide (TESTING.md)
   - Added `.env.local.example` template
+
+### 2026-01-14 (Session 3)
+- Completed #3: Tax rates lookup table
+  - Created `lib/tax-rates.ts` with all 50 US states + DC tax rates
+  - Implemented fuzzy matching for state input (abbreviations, full names, partial matches)
+- Completed #4: URL validator with SSRF protection
+  - Created `lib/url-validator.ts` to validate PDF/image URLs
+  - Blocks private IPs, localhost, metadata endpoints
+  - Supports .pdf, .jpg, .jpeg, .png, .gif, .webp extensions
+- Completed #5: Claude API wrapper
+  - Created `lib/claude.ts` with Claude 4.5 Sonnet integration
+  - Supports both document type (PDFs) and image types
+  - Handles URL-based and file upload analysis
+  - Added streaming support with progress callbacks
+  - Extracts dietary indicators (spicy, vegetarian, vegan, gluten-free, kosher)
+- Completed #7: Parse-menu API endpoint
+  - Created `app/api/parse-menu/route.ts` with dual input support
+  - Handles FormData (file uploads) and JSON (URLs)
+  - Implements Server-Sent Events (SSE) for streaming progress
+  - Comprehensive error logging with full stack traces
+  - Stores parsed menu data in Supabase with all dietary indicators
+- Completed #6: Landing page UI
+  - Updated `app/page.tsx` with tab-based interface
+  - "Upload File" tab with drag-and-drop support
+  - "Paste URL" tab for PDF/image URLs
+  - Progress indicators and detailed error display
+  - Redirects to cart page on success
+- Database schema fix
+  - Made `pdf_url` nullable in menus table to support uploaded files
+  - Created migration `supabase/migrations/001_make_pdf_url_nullable.sql`
+  - Updated TypeScript types to reflect `pdf_url: string | null`
+- Completed cart page implementation
+  - Created `app/api/cart/[id]/route.ts` for fetching cart data
+  - Built text-only cart page in `app/cart/[id]/page.tsx`
+  - Displays parsed menu items grouped by category
+  - Shows dietary indicators with emoji icons
+  - Displays restaurant info, location, and tax rate
+  - Shows current cart items if any exist
+  - Loading states and error handling
+
+### Key Accomplishments (Session 3)
+- Full menu parsing pipeline working (PDF/image upload → Claude analysis → database storage)
+- Support for both file uploads and URL-based menus
+- Streaming progress indicators during Claude API calls
+- Comprehensive error logging for debugging
+- Database constraint fix for uploaded files
+- Working cart page to verify parsed menu data
