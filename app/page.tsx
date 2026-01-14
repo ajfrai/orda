@@ -50,11 +50,13 @@ export default function Home() {
 
     try {
       let body: any;
-      let headers: HeadersInit = {};
+      let headers: HeadersInit = {
+        'Accept': 'text/event-stream', // Request streaming
+      };
 
       if (mode === 'url') {
         // Send URL as JSON
-        headers = { 'Content-Type': 'application/json' };
+        headers['Content-Type'] = 'application/json';
         body = JSON.stringify({ pdfUrl: menuUrl });
       } else {
         // Send file as FormData
@@ -67,11 +69,11 @@ export default function Home() {
         formData.append('file', selectedFile);
         body = formData;
         // Don't set Content-Type header for FormData - browser will set it with boundary
+        delete headers['Content-Type'];
       }
 
-      console.log('[DEBUG] Sending request to /api/parse-menu');
+      console.log('[DEBUG] Sending streaming request to /api/parse-menu');
       console.log('[DEBUG] Mode:', mode);
-      console.log('[DEBUG] Headers:', headers);
 
       let response;
       try {
@@ -83,49 +85,59 @@ export default function Home() {
       } catch (fetchError) {
         // Network error - fetch itself failed
         const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-        throw new Error(`Network request failed: ${errorMsg}. This could be due to: connection issues, CORS blocking, or the server being unreachable.`);
-      }
-
-      console.log('[DEBUG] Response status:', response.status);
-      console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const contentType = response.headers.get('content-type');
-      let data;
-
-      try {
-        if (contentType?.includes('application/json')) {
-          data = await response.json();
-          console.log('[DEBUG] Response data:', data);
-        } else {
-          const text = await response.text();
-          console.log('[DEBUG] Response text:', text);
-          data = { error: 'Non-JSON response: ' + text.substring(0, 200) };
-        }
-      } catch (parseError) {
-        // Response parsing failed
-        const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
-        throw new Error(`Failed to parse server response: ${errorMsg}`);
+        throw new Error(`Network request failed: ${errorMsg}`);
       }
 
       if (!response.ok) {
-        const errorMessage = data.error || 'Failed to process menu';
-        const debugInfo = `
-Status: ${response.status}
-Error: ${errorMessage}
-Mode: ${mode}
-${mode === 'upload' ? `File: ${selectedFile?.name} (${selectedFile?.type})` : `URL: ${menuUrl}`}
-
-Full response:
-${JSON.stringify(data, null, 2)}
-        `.trim();
-
-        setErrorDetails(debugInfo);
-        setIsLoading(false);
-        return;
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
 
-      // Redirect to cart page
-      window.location.href = `/cart/${data.cartId}`;
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            const eventType = line.substring(7).trim();
+            continue;
+          }
+
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.substring(6));
+
+            // Handle different event types
+            if (data.error) {
+              throw new Error(data.error);
+            }
+
+            // Navigate on first item
+            if (data.cartId && !window.location.pathname.includes('/cart/')) {
+              console.log('[DEBUG] First item received, navigating to cart:', data.cartId);
+              window.location.href = `/cart/${data.cartId}?streaming=true`;
+              return; // Stop processing
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('[DEBUG] Error creating cart:', error);
 

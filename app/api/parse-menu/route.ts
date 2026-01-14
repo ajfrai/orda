@@ -326,12 +326,122 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           };
         }
 
+        // Track state for incremental menu creation
+        let cartId: string | null = null;
+        let menuId: string | null = null;
+        let metadata: { restaurantName: string; location?: { city?: string; state?: string } } | null = null;
+        const receivedItems: Array<any> = [];
+        const supabase = getServiceRoleClient();
+
         // Analyze menu with progress updates
-        const result = await analyzeMenuWithProgress(fileData, (event: ProgressEvent) => {
+        const result = await analyzeMenuWithProgress(fileData, async (event: ProgressEvent) => {
           if (event.type === 'status') {
             sendEvent('status', { message: event.message });
           } else if (event.type === 'progress') {
             sendEvent('progress', { current: event.current, total: event.total });
+          } else if (event.type === 'metadata') {
+            // Store metadata
+            metadata = {
+              restaurantName: event.restaurantName,
+              location: event.location,
+            };
+            sendEvent('metadata', metadata);
+          } else if (event.type === 'item') {
+            // Received a new item - store it
+            const menuItem = {
+              category: event.category,
+              name: event.item.name,
+              description: event.item.description || null,
+              price: event.item.price || 0,
+              is_estimate: event.item.isEstimate,
+              is_spicy: event.item.isSpicy || false,
+              is_vegetarian: event.item.isVegetarian || false,
+              is_vegan: event.item.isVegan || false,
+              is_gluten_free: event.item.isGlutenFree || false,
+              is_kosher: event.item.isKosher || false,
+            };
+            receivedItems.push(menuItem);
+
+            // Create menu and cart on first item (if we have metadata)
+            if (!cartId && metadata && receivedItems.length === 1) {
+              try {
+                sendEvent('status', { message: 'Creating cart...' });
+
+                // Get tax rate
+                const taxRate = getTaxRate(metadata.location?.state);
+
+                // Create menu with first item
+                const { data: menu, error: menuError } = await supabase
+                  .from('menus')
+                  .insert({
+                    pdf_url: sourceUrl || null,
+                    restaurant_name: metadata.restaurantName,
+                    location_city: metadata.location?.city || null,
+                    location_state: metadata.location?.state || null,
+                    tax_rate: taxRate,
+                    items: [menuItem], // Start with first item
+                  })
+                  .select()
+                  .single();
+
+                if (menuError) {
+                  console.error('Error creating menu:', menuError);
+                  sendEvent('error', { error: 'Failed to create menu' });
+                  return;
+                }
+
+                menuId = menu.id;
+
+                // Create cart
+                const { data: cart, error: cartError } = await supabase
+                  .from('carts')
+                  .insert({
+                    menu_id: menu.id,
+                    tip_percentage: 18,
+                  })
+                  .select()
+                  .single();
+
+                if (cartError) {
+                  console.error('Error creating cart:', cartError);
+                  sendEvent('error', { error: 'Failed to create cart' });
+                  return;
+                }
+
+                cartId = cart.id;
+
+                // Send firstItem event to trigger navigation
+                sendEvent('firstItem', {
+                  cartId: cart.id,
+                  restaurantName: metadata.restaurantName,
+                  item: event.item,
+                });
+              } catch (err) {
+                console.error('Error in first item processing:', err);
+                sendEvent('error', { error: 'Failed to create cart' });
+                return;
+              }
+            } else if (cartId && menuId) {
+              // Update menu with new item
+              try {
+                await supabase
+                  .from('menus')
+                  .update({
+                    items: receivedItems,
+                  })
+                  .eq('id', menuId);
+              } catch (err) {
+                console.error('Error updating menu:', err);
+                // Don't fail on update errors, continue streaming
+              }
+            }
+
+            // Send the item to the client
+            sendEvent('item', {
+              item: event.item,
+              category: event.category,
+              cartId: cartId,
+            });
           } else if (event.type === 'error') {
             sendEvent('error', { error: event.error });
           }
@@ -350,88 +460,97 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           return;
         }
 
-        // Get tax rate
-        sendEvent('status', { message: 'Calculating tax rate...' });
-        const taxRate = getTaxRate(result.location?.state);
+        // If cart was already created (streaming path), just update with final items
+        if (cartId && menuId) {
+          sendEvent('status', { message: 'Finalizing menu...' });
 
-        // Flatten categories
-        const menuItems = result.categories.flatMap((category) =>
-          category.items.map((item) => ({
-            category: category.category,
-            name: item.name,
-            description: item.description || null,
-            price: item.price || 0,
-            is_estimate: item.isEstimate,
-            is_spicy: item.isSpicy || false,
-            is_vegetarian: item.isVegetarian || false,
-            is_vegan: item.isVegan || false,
-            is_gluten_free: item.isGlutenFree || false,
-            is_kosher: item.isKosher || false,
-          }))
-        );
+          // Make sure we have all items
+          const allItems = result.categories.flatMap((category) =>
+            category.items.map((item) => ({
+              category: category.category,
+              name: item.name,
+              description: item.description || null,
+              price: item.price || 0,
+              is_estimate: item.isEstimate,
+              is_spicy: item.isSpicy || false,
+              is_vegetarian: item.isVegetarian || false,
+              is_vegan: item.isVegan || false,
+              is_gluten_free: item.isGlutenFree || false,
+              is_kosher: item.isKosher || false,
+            }))
+          );
 
-        // Create database records
-        sendEvent('status', { message: 'Saving menu to database...' });
+          // Final update with all items
+          await supabase
+            .from('menus')
+            .update({ items: allItems })
+            .eq('id', menuId);
 
-        const supabase = getServiceRoleClient();
-
-        const { data: menu, error: menuError } = await supabase
-          .from('menus')
-          .insert({
-            pdf_url: sourceUrl || null,
-            restaurant_name: result.restaurantName,
-            location_city: result.location?.city || null,
-            location_state: result.location?.state || null,
-            tax_rate: taxRate,
-            items: menuItems,
-          })
-          .select()
-          .single();
-
-        if (menuError) {
-          console.error('Error creating menu:', menuError);
-          sendEvent('error', {
-            error: 'Failed to save menu data',
-            details: {
-              message: menuError.message,
-              code: menuError.code,
-              hint: menuError.hint,
-              details: menuError.details,
-            }
+          sendEvent('complete', {
+            cartId: cartId,
+            restaurantName: result.restaurantName,
           });
-          controller.close();
-          return;
-        }
+        } else {
+          // Fallback: if cart wasn't created during streaming, create it now
+          sendEvent('status', { message: 'Creating cart...' });
 
-        const { data: cart, error: cartError } = await supabase
-          .from('carts')
-          .insert({
-            menu_id: menu.id,
-            tip_percentage: 18,
-          })
-          .select()
-          .single();
+          const taxRate = getTaxRate(result.location?.state);
+          const menuItems = result.categories.flatMap((category) =>
+            category.items.map((item) => ({
+              category: category.category,
+              name: item.name,
+              description: item.description || null,
+              price: item.price || 0,
+              is_estimate: item.isEstimate,
+              is_spicy: item.isSpicy || false,
+              is_vegetarian: item.isVegetarian || false,
+              is_vegan: item.isVegan || false,
+              is_gluten_free: item.isGlutenFree || false,
+              is_kosher: item.isKosher || false,
+            }))
+          );
 
-        if (cartError) {
-          console.error('Error creating cart:', cartError);
-          sendEvent('error', {
-            error: 'Failed to create cart',
-            details: {
-              message: cartError.message,
-              code: cartError.code,
-              hint: cartError.hint,
-              details: cartError.details,
-            }
+          const { data: menu, error: menuError } = await supabase
+            .from('menus')
+            .insert({
+              pdf_url: sourceUrl || null,
+              restaurant_name: result.restaurantName,
+              location_city: result.location?.city || null,
+              location_state: result.location?.state || null,
+              tax_rate: taxRate,
+              items: menuItems,
+            })
+            .select()
+            .single();
+
+          if (menuError) {
+            console.error('Error creating menu:', menuError);
+            sendEvent('error', { error: 'Failed to save menu data' });
+            controller.close();
+            return;
+          }
+
+          const { data: cart, error: cartError } = await supabase
+            .from('carts')
+            .insert({
+              menu_id: menu.id,
+              tip_percentage: 18,
+            })
+            .select()
+            .single();
+
+          if (cartError) {
+            console.error('Error creating cart:', cartError);
+            sendEvent('error', { error: 'Failed to create cart' });
+            controller.close();
+            return;
+          }
+
+          sendEvent('complete', {
+            cartId: cart.id,
+            restaurantName: menu.restaurant_name,
           });
-          controller.close();
-          return;
         }
-
-        // Send success
-        sendEvent('complete', {
-          cartId: cart.id,
-          restaurantName: menu.restaurant_name,
-        });
 
         controller.close();
       } catch (error) {

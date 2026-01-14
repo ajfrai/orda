@@ -1,7 +1,7 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useRef } from 'react';
 import type { Menu, MenuItem, Cart, CartItem } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
 
@@ -13,10 +13,15 @@ interface CartResponse {
 
 export default function CartPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const cartId = params?.id as string;
+  const isStreaming = searchParams?.get('streaming') === 'true';
+
   const [data, setData] = useState<CartResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streamingComplete, setStreamingComplete] = useState(false);
+  const previousItemCount = useRef(0);
 
   useEffect(() => {
     async function fetchCart() {
@@ -28,9 +33,9 @@ export default function CartPage() {
         }
         const cartData = await response.json();
         setData(cartData);
+        setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
         setLoading(false);
       }
     }
@@ -39,6 +44,47 @@ export default function CartPage() {
       fetchCart();
     }
   }, [cartId]);
+
+  // Poll for updates when streaming
+  useEffect(() => {
+    if (!isStreaming || streamingComplete || !cartId) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/cart/${cartId}`);
+        if (!response.ok) return;
+
+        const cartData = await response.json();
+
+        // Check if we have new items
+        const currentItemCount = cartData.menu.items.length;
+        if (currentItemCount > previousItemCount.current) {
+          console.log('[DEBUG] New items detected:', currentItemCount, 'vs', previousItemCount.current);
+          setData(cartData);
+          previousItemCount.current = currentItemCount;
+        }
+
+        // Stop polling after 30 seconds or when we haven't received new items for 5 polls
+        // This is a simple heuristic - in production you'd want a better signal
+      } catch (err) {
+        console.error('Error polling for updates:', err);
+      }
+    }, 500); // Poll every 500ms
+
+    // Stop polling after 60 seconds
+    const timeout = setTimeout(() => {
+      console.log('[DEBUG] Stopping polling after timeout');
+      setStreamingComplete(true);
+      clearInterval(pollInterval);
+    }, 60000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(timeout);
+    };
+  }, [cartId, isStreaming, streamingComplete]);
 
   // Group items by category
   const groupedItems = data?.menu.items.reduce((acc, item) => {
@@ -88,6 +134,12 @@ export default function CartPage() {
                   >
                     View original menu
                   </a>
+                )}
+                {isStreaming && !streamingComplete && (
+                  <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+                    <span>Loading menu items...</span>
+                  </div>
                 )}
               </div>
 

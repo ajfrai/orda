@@ -334,8 +334,72 @@ export async function analyzeMenuFromUpload(
 export type ProgressEvent =
   | { type: 'status'; message: string }
   | { type: 'progress'; current: number; total: number }
+  | { type: 'metadata'; restaurantName: string; location?: { city?: string; state?: string } }
+  | { type: 'item'; item: MenuItem; category: string }
   | { type: 'complete'; result: MenuAnalysisResult }
   | { type: 'error'; error: string };
+
+/**
+ * Helper function to try extracting data from incomplete JSON
+ * Returns metadata and new items that haven't been emitted yet
+ */
+function tryExtractData(
+  jsonText: string,
+  alreadyEmittedCount: number
+): {
+  metadata?: { restaurantName: string; location?: { city?: string; state?: string } };
+  items: Array<{ item: MenuItem; category: string }>;
+} {
+  try {
+    // Clean up markdown code blocks if present
+    let cleanedText = jsonText.trim();
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.replace(/^```json\n?/, '');
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```\n?/, '');
+    }
+
+    // Try to parse as-is first
+    let parsed: Partial<MenuAnalysisResult>;
+    try {
+      parsed = JSON.parse(cleanedText);
+    } catch {
+      // If parsing fails, return empty
+      return { items: [] };
+    }
+
+    // Extract metadata
+    let metadata: { restaurantName: string; location?: { city?: string; state?: string } } | undefined;
+    if (parsed.restaurantName) {
+      metadata = {
+        restaurantName: parsed.restaurantName,
+        location: parsed.location,
+      };
+    }
+
+    // Extract items from categories
+    const allItems: Array<{ item: MenuItem; category: string }> = [];
+    if (parsed.categories && Array.isArray(parsed.categories)) {
+      for (const category of parsed.categories) {
+        if (!category.items || !Array.isArray(category.items)) {
+          continue;
+        }
+        for (const item of category.items) {
+          allItems.push({ item, category: category.category });
+        }
+      }
+    }
+
+    // Return metadata and only new items
+    return {
+      metadata,
+      items: allItems.slice(alreadyEmittedCount),
+    };
+  } catch (error) {
+    // Silently fail - we'll try again on next chunk
+    return { items: [] };
+  }
+}
 
 /**
  * Streaming version - analyze menu with progress updates
@@ -444,6 +508,8 @@ IMPORTANT:
 
     let accumulatedText = '';
     let tokenCount = 0;
+    let emittedItemCount = 0;
+    let metadataEmitted = false;
 
     onProgress({ type: 'status', message: 'Analyzing menu...' });
 
@@ -453,13 +519,32 @@ IMPORTANT:
         accumulatedText += chunk.delta.text;
         tokenCount += 1;
 
-        // Send progress update every 50 tokens
+        // Try to parse and emit data every 50 tokens
         if (tokenCount % 50 === 0) {
           onProgress({
             type: 'progress',
             current: tokenCount,
             total: 4096, // max_tokens
           });
+
+          // Try to parse incomplete JSON and extract data
+          const extracted = tryExtractData(accumulatedText, emittedItemCount);
+
+          // Emit metadata once when available
+          if (!metadataEmitted && extracted.metadata) {
+            onProgress({
+              type: 'metadata',
+              restaurantName: extracted.metadata.restaurantName,
+              location: extracted.metadata.location,
+            });
+            metadataEmitted = true;
+          }
+
+          // Emit new items
+          for (const { item, category } of extracted.items) {
+            onProgress({ type: 'item', item, category });
+            emittedItemCount++;
+          }
         }
       }
     }
