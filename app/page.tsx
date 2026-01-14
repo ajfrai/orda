@@ -2,21 +2,61 @@
 
 import { useState } from 'react';
 
+type InputMode = 'upload' | 'url';
+
 export default function Home() {
+  const [mode, setMode] = useState<InputMode>('upload');
   const [menuUrl, setMenuUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        alert('Please select a PDF or image file (JPG, PNG, GIF, WebP)');
+        return;
+      }
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File is too large. Maximum size is 10MB.');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
+      let body: any;
+      let headers: HeadersInit = {};
+
+      if (mode === 'url') {
+        // Send URL as JSON
+        headers = { 'Content-Type': 'application/json' };
+        body = JSON.stringify({ pdfUrl: menuUrl });
+      } else {
+        // Send file as FormData
+        if (!selectedFile) {
+          alert('Please select a file');
+          setIsLoading(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        body = formData;
+        // Don't set Content-Type header for FormData - browser will set it with boundary
+      }
+
       const response = await fetch('/api/parse-menu', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pdfUrl: menuUrl }),
+        headers,
+        body,
       });
 
       const data = await response.json();
@@ -52,29 +92,106 @@ export default function Home() {
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
+          {/* Tab switcher */}
+          <div className="flex gap-2 mb-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setMode('upload')}
+              disabled={isLoading}
+              className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-all ${
+                mode === 'upload'
+                  ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Upload File
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('url')}
+              disabled={isLoading}
+              className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition-all ${
+                mode === 'url'
+                  ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Paste URL
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label
-                htmlFor="menu-url"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-              >
-                Restaurant Menu PDF URL
-              </label>
-              <input
-                id="menu-url"
-                type="url"
-                value={menuUrl}
-                onChange={(e) => setMenuUrl(e.target.value)}
-                placeholder="https://example.com/menu.pdf"
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            {mode === 'upload' ? (
+              <div>
+                <label
+                  htmlFor="menu-file"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  Restaurant Menu (PDF or Image)
+                </label>
+                <div className="relative">
+                  <input
+                    id="menu-file"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/*"
+                    onChange={handleFileChange}
+                    disabled={isLoading}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="menu-file"
+                    className={`flex items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      selectedFile
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-indigo-400 dark:hover:border-indigo-500'
+                    } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <div className="text-center">
+                      {selectedFile ? (
+                        <>
+                          <div className="text-indigo-600 dark:text-indigo-400 mb-1">✓ {selectedFile.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-gray-600 dark:text-gray-400 mb-1">
+                            Click to select or drag and drop
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            PDF, JPG, PNG, GIF, WebP (max 10MB)
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label
+                  htmlFor="menu-url"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  Menu URL (PDF or Image)
+                </label>
+                <input
+                  id="menu-url"
+                  type="url"
+                  value={menuUrl}
+                  onChange={(e) => setMenuUrl(e.target.value)}
+                  placeholder="https://example.com/menu.pdf"
+                  className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            )}
 
             <button
               type="submit"
-              disabled={isLoading || !menuUrl}
+              disabled={isLoading || (mode === 'url' && !menuUrl) || (mode === 'upload' && !selectedFile)}
               className="w-full py-4 px-6 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-lg shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isLoading ? (
@@ -110,7 +227,7 @@ export default function Home() {
             <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
               <li className="flex gap-2">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">1.</span>
-                <span>Paste a link to a restaurant menu PDF</span>
+                <span>Upload a menu image or paste a PDF/image URL</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">2.</span>

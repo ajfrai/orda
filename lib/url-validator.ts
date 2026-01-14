@@ -94,12 +94,17 @@ export function validatePdfUrl(urlString: string): ValidationResult {
     }
   }
 
-  // Check file extension (optional but helpful)
+  // Check file extension (PDF or image formats)
   const pathname = url.pathname.toLowerCase();
-  if (!pathname.endsWith('.pdf') && !pathname.includes('.pdf?')) {
+  const validExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
+  const hasValidExtension = validExtensions.some(ext =>
+    pathname.endsWith(ext) || pathname.includes(`${ext}?`)
+  );
+
+  if (!hasValidExtension) {
     return {
       valid: false,
-      error: 'URL must point to a PDF file (.pdf extension)',
+      error: 'URL must point to a PDF or image file (.pdf, .jpg, .png, etc.)',
     };
   }
 
