@@ -363,9 +363,18 @@ function tryExtractData(
     let parsed: Partial<MenuAnalysisResult>;
     try {
       parsed = JSON.parse(cleanedText);
-    } catch {
-      // If parsing fails, return empty
-      return { items: [] };
+    } catch (parseError) {
+      // If parsing fails, try to fix incomplete JSON by closing structures
+      const fixed = attemptToFixIncompleteJson(cleanedText);
+      if (!fixed) {
+        return { items: [] };
+      }
+
+      try {
+        parsed = JSON.parse(fixed);
+      } catch {
+        return { items: [] };
+      }
     }
 
     // Extract metadata
@@ -398,6 +407,77 @@ function tryExtractData(
   } catch (error) {
     // Silently fail - we'll try again on next chunk
     return { items: [] };
+  }
+}
+
+/**
+ * Attempt to fix incomplete JSON by closing open structures
+ * This allows us to parse partial JSON as it streams
+ */
+function attemptToFixIncompleteJson(json: string): string | null {
+  try {
+    // Count open/close braces and brackets to determine what needs closing
+    let openBraces = 0;
+    let openBrackets = 0;
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < json.length; i++) {
+      const char = json[i];
+
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escapeNext = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (inString) {
+        continue;
+      }
+
+      if (char === '{') {
+        openBraces++;
+      } else if (char === '}') {
+        openBraces--;
+      } else if (char === '[') {
+        openBrackets++;
+      } else if (char === ']') {
+        openBrackets--;
+      }
+    }
+
+    // If we're in a string, close it
+    let fixed = json;
+    if (inString) {
+      fixed += '"';
+    }
+
+    // Remove trailing incomplete value (e.g., `"price": 12.9` -> `"price": 12.9`)
+    // Look for incomplete number or string at the end
+    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*[0-9.]*$/, '');
+    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '');
+    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*$/, '');
+
+    // Close arrays and objects
+    for (let i = 0; i < openBrackets; i++) {
+      fixed += ']';
+    }
+    for (let i = 0; i < openBraces; i++) {
+      fixed += '}';
+    }
+
+    return fixed;
+  } catch (error) {
+    return null;
   }
 }
 
