@@ -292,13 +292,41 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           // Fetch file data
           sendEvent('status', { message: 'Fetching menu file...' });
 
-          const response = await fetch(pdfUrl, {
-            headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
-            signal: AbortSignal.timeout(30000),
-          });
+          let response;
+          try {
+            response = await fetch(pdfUrl, {
+              headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
+              signal: AbortSignal.timeout(30000),
+            });
+          } catch (fetchError) {
+            const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+            let userMessage = 'Failed to fetch file from URL.';
+
+            if (errorMsg.includes('aborted') || errorMsg.includes('timeout')) {
+              userMessage = 'Request timeout: The file took too long to download (30s limit). The server may be slow or the file may be too large.';
+            } else if (errorMsg.includes('CORS') || errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
+              userMessage = 'Cannot access this URL due to CORS restrictions or network blocking. Try uploading the file directly instead.';
+            } else {
+              userMessage = `Network error: ${errorMsg}. The URL may not be publicly accessible.`;
+            }
+
+            sendEvent('error', { error: userMessage });
+            controller.close();
+            return;
+          }
 
           if (!response.ok) {
-            sendEvent('error', { error: `Failed to fetch file: ${response.status}` });
+            const statusMessages: Record<number, string> = {
+              403: 'Access forbidden. The URL may require authentication or block automated requests.',
+              404: 'File not found. The URL may be incorrect or the file may have been moved.',
+              500: 'Server error. The website hosting the file is experiencing issues.',
+              503: 'Service unavailable. The website is temporarily down.',
+            };
+
+            const errorMsg = statusMessages[response.status] ||
+              `HTTP ${response.status}: Failed to fetch file. The file may not be publicly accessible.`;
+
+            sendEvent('error', { error: errorMsg });
             controller.close();
             return;
           }
