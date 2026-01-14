@@ -10,11 +10,30 @@ export default function Home() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Painted door: Show that backend isn't connected yet
-    setTimeout(() => {
-      alert('Backend not connected yet! The /api/parse-menu endpoint needs to be implemented.');
+    try {
+      const response = await fetch('/api/parse-menu', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pdfUrl: menuUrl }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to process menu');
+        setIsLoading(false);
+        return;
+      }
+
+      // Redirect to cart page
+      window.location.href = `/cart/${data.cartId}`;
+    } catch (error) {
+      console.error('Error creating cart:', error);
+      alert('An error occurred while processing the menu. Please try again.');
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (

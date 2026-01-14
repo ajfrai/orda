@@ -43,13 +43,12 @@ export interface CartItem {
 // API request/response types
 
 export interface ParseMenuRequest {
-  pdf_url: string;
+  pdfUrl: string;
 }
 
 export interface ParseMenuResponse {
-  success: boolean;
-  cart_id?: string;
-  error?: string;
+  cartId: string;
+  restaurantName: string;
 }
 
 export interface ClaudeMenuAnalysis {
