@@ -25,6 +25,9 @@ Real-time enabled on `cart_items` table.
 - `PLAN.md` - Full application architecture and design decisions
 - `supabase/schema.sql` - Database schema (already applied)
 
+### Code
+- [x] TypeScript type definitions (`types/index.ts`) - Menu, Cart, CartItem models + API types
+
 ## What's Not Done
 
 See GitHub Issues #1-14 for all remaining tasks.
@@ -82,7 +85,13 @@ Required in `.env.local` and Vercel:
 
 ## Session Log
 
-### 2026-01-14
+### 2026-01-14 (Session 1)
 - Initial planning session
 - Set up Next.js, Supabase, Vercel
 - Created 14 GitHub issues for implementation tasks
+
+### 2026-01-14 (Session 2)
+- Completed #1: TypeScript type definitions
+  - Created `types/index.ts` with Menu, Cart, CartItem interfaces
+  - Added API request/response types
+  - Defined UI helper types and tip presets
