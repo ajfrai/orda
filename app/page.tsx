@@ -73,11 +73,18 @@ export default function Home() {
       console.log('[DEBUG] Mode:', mode);
       console.log('[DEBUG] Headers:', headers);
 
-      const response = await fetch('/api/parse-menu', {
-        method: 'POST',
-        headers,
-        body,
-      });
+      let response;
+      try {
+        response = await fetch('/api/parse-menu', {
+          method: 'POST',
+          headers,
+          body,
+        });
+      } catch (fetchError) {
+        // Network error - fetch itself failed
+        const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+        throw new Error(`Network request failed: ${errorMsg}. This could be due to: connection issues, CORS blocking, or the server being unreachable.`);
+      }
 
       console.log('[DEBUG] Response status:', response.status);
       console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
@@ -85,13 +92,19 @@ export default function Home() {
       const contentType = response.headers.get('content-type');
       let data;
 
-      if (contentType?.includes('application/json')) {
-        data = await response.json();
-        console.log('[DEBUG] Response data:', data);
-      } else {
-        const text = await response.text();
-        console.log('[DEBUG] Response text:', text);
-        data = { error: 'Non-JSON response: ' + text.substring(0, 200) };
+      try {
+        if (contentType?.includes('application/json')) {
+          data = await response.json();
+          console.log('[DEBUG] Response data:', data);
+        } else {
+          const text = await response.text();
+          console.log('[DEBUG] Response text:', text);
+          data = { error: 'Non-JSON response: ' + text.substring(0, 200) };
+        }
+      } catch (parseError) {
+        // Response parsing failed
+        const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
+        throw new Error(`Failed to parse server response: ${errorMsg}`);
       }
 
       if (!response.ok) {

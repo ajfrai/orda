@@ -46,15 +46,27 @@ interface FileData {
  * Fetch file (PDF or image) from URL and return as base64 with media type
  */
 async function fetchFileAsBase64(url: string): Promise<FileData> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Orda-Menu-Parser/1.0',
-    },
-    signal: AbortSignal.timeout(30000), // 30 second timeout
-  });
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Orda-Menu-Parser/1.0',
+      },
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+    });
+  } catch (fetchError) {
+    // Network/fetch error
+    const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+
+    if (errorMsg.includes('aborted')) {
+      throw new Error(`Request timeout: The file took too long to download (30s limit). The file may be too large or the server is slow.`);
+    }
+
+    throw new Error(`Failed to fetch file from URL: ${errorMsg}. This could be due to: network issues, CORS restrictions, DNS resolution failure, or the server blocking the request.`);
+  }
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch file: HTTP ${response.status} ${response.statusText}. The file may be protected, moved, or not publicly accessible.`);
   }
 
   // Check file size (10MB limit)
