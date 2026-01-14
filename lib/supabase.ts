@@ -1,25 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from './database.types';
 
 // Environment variables validation
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
 }
 
-if (!supabaseAnonKey) {
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable');
 }
+
+// After validation, these are guaranteed to be strings
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
 
 /**
  * Client-side Supabase client
  * Use this in Client Components and browser-side code
  * Has Row Level Security (RLS) policies enforced
  */
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * Server-side Supabase client with service role key
@@ -29,11 +28,13 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
  * @throws Error if SUPABASE_SERVICE_ROLE_KEY is not set
  */
 export function getServiceRoleClient() {
-  if (!supabaseServiceRoleKey) {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
     throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
   }
 
-  return createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
+  return createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -47,36 +48,42 @@ export function getServiceRoleClient() {
 export async function getCartWithData(cartId: string) {
   const client = getServiceRoleClient();
 
-  const { data: cart, error: cartError } = await client
+  const cartResult = await client
     .from('carts')
     .select('*')
     .eq('id', cartId)
     .single();
 
-  if (cartError) throw cartError;
-  if (!cart) throw new Error('Cart not found');
+  if (cartResult.error || !cartResult.data) {
+    throw cartResult.error || new Error('Cart not found');
+  }
 
-  const { data: menu, error: menuError } = await client
+  const cart = cartResult.data;
+
+  const menuResult = await client
     .from('menus')
     .select('*')
     .eq('id', cart.menu_id)
     .single();
 
-  if (menuError) throw menuError;
-  if (!menu) throw new Error('Menu not found');
+  if (menuResult.error || !menuResult.data) {
+    throw menuResult.error || new Error('Menu not found');
+  }
 
-  const { data: items, error: itemsError } = await client
+  const menu = menuResult.data;
+
+  const itemsResult = await client
     .from('cart_items')
     .select('*')
     .eq('cart_id', cartId)
     .order('created_at', { ascending: true });
 
-  if (itemsError) throw itemsError;
+  if (itemsResult.error) throw itemsResult.error;
 
   return {
     cart,
     menu,
-    items: items || [],
+    items: itemsResult.data || [],
   };
 }
 
@@ -86,7 +93,7 @@ export async function getCartWithData(cartId: string) {
  */
 export function subscribeToCartItems(
   cartId: string,
-  callback: (items: Database['public']['Tables']['cart_items']['Row'][]) => void
+  callback: (items: any[]) => void
 ) {
   const channel = supabase
     .channel(`cart_items:${cartId}`)
