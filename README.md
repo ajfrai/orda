@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Orda
 
-## Getting Started
+Shared menu ordering app. Paste a restaurant menu PDF, get a shareable cart where friends can collaboratively build an order with automatic cost splitting.
 
-First, run the development server:
+> **For AI Assistants / Claude Code**: Read `PROGRESS.md` before starting any development work on this project. It contains current status, build order, and session history.
+
+## Quick Start
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Documentation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **[PROGRESS.md](./PROGRESS.md)** - Current development status and session log (READ THIS FIRST)
+- **[PLAN.md](./PLAN.md)** - Architecture, design decisions, and technical spec
+- **[GitHub Issues](https://github.com/ajfrai/orda/issues)** - Implementation tasks
 
-## Learn More
+## Tech Stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework**: Next.js 14 (App Router)
+- **Database**: Supabase (Postgres + Realtime)
+- **AI**: Claude API (Vision for PDF parsing)
+- **Styling**: Tailwind CSS
+- **Hosting**: Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment Variables
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Copy `.env.local.example` to `.env.local` and fill in:
 
-## Deploy on Vercel
+```
+ANTHROPIC_API_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deployment
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Production auto-deploys from `main` branch to: https://orda-beta.vercel.app
