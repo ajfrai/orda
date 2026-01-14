@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 type InputMode = 'upload' | 'url';
 
@@ -16,6 +16,15 @@ export default function Home() {
     parsing: false,
     streaming: false,
   });
+  const [streamingCart, setStreamingCart] = useState<{
+    cartId: string;
+    restaurantName: string;
+    location?: { city?: string; state?: string };
+    items: Array<{ item: any; category: string }>;
+    isComplete: boolean;
+  } | null>(null);
+  const cartCreatedRef = useRef(false);
+  const metadataRef = useRef<{ restaurantName: string; location?: { city?: string; state?: string } } | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,6 +62,9 @@ export default function Home() {
     setIsLoading(true);
     setErrorDetails(null);
     setProgressStages({ downloading: false, parsing: false, streaming: false });
+    setStreamingCart(null);
+    cartCreatedRef.current = false;
+    metadataRef.current = null;
 
     try {
       let body: any;
@@ -192,12 +204,46 @@ export default function Home() {
               }
             }
 
-            // Navigate on first item
-            if (data.cartId && !window.location.pathname.includes('/cart/')) {
-              console.log('[DEBUG] First item received, navigating to cart:', data.cartId);
+            // Handle metadata
+            if (data.restaurantName && !data.cartId && !data.item) {
+              console.log('[DEBUG] Received metadata:', data.restaurantName);
+              metadataRef.current = {
+                restaurantName: data.restaurantName,
+                location: data.location,
+              };
+            }
+
+            // Handle first item - create cart view
+            if (data.cartId && !cartCreatedRef.current) {
+              console.log('[DEBUG] First item received, showing cart:', data.cartId);
+              cartCreatedRef.current = true;
               setProgressStages({ downloading: true, parsing: true, streaming: true });
-              window.location.href = `/cart/${data.cartId}?streaming=true`;
-              return; // Stop processing
+              setStreamingCart({
+                cartId: data.cartId,
+                restaurantName: data.restaurantName || metadataRef.current?.restaurantName || 'Menu',
+                location: metadataRef.current?.location,
+                items: data.item ? [{ item: data.item, category: data.category }] : [],
+                isComplete: false,
+              });
+            }
+            // Handle subsequent items
+            else if (data.item && data.category && cartCreatedRef.current) {
+              console.log('[DEBUG] New item received:', data.item.name);
+              setStreamingCart(prev => prev ? {
+                ...prev,
+                items: [...prev.items, { item: data.item, category: data.category }],
+              } : null);
+            }
+
+            // Handle completion event
+            if (data.cartId && data.restaurantName && !data.item && !data.message) {
+              console.log('[DEBUG] Streaming complete, received complete event');
+              setStreamingCart(prev => prev ? { ...prev, isComplete: true } : null);
+
+              // Navigate to final cart page after a brief delay
+              setTimeout(() => {
+                window.location.href = `/cart/${data.cartId}`;
+              }, 1500);
             }
           }
         }
@@ -224,22 +270,33 @@ Request details:
     }
   };
 
+  // Group items by category for streaming cart display
+  const groupedStreamingItems = streamingCart?.items.reduce((acc, { item, category }) => {
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(item);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
       <main className="w-full max-w-xl px-6 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Orda
-          </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-2">
-            Order together, split the bill effortlessly
-          </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Share a menu, build a cart with friends, and split costs automatically
-          </p>
-        </div>
+        {!streamingCart && (
+          <>
+            <div className="text-center mb-12">
+              <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Orda
+              </h1>
+              <p className="text-xl text-gray-600 dark:text-gray-300 mb-2">
+                Order together, split the bill effortlessly
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Share a menu, build a cart with friends, and split costs automatically
+              </p>
+            </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
           {/* Tab switcher */}
           <div className="flex gap-2 mb-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
             <button
@@ -465,11 +522,80 @@ Request details:
               </li>
             </ol>
           </div>
-        </div>
+            </div>
+          </>
+        )}
 
-        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-8">
-          Powered by Claude AI for intelligent menu parsing
-        </p>
+        {/* Streaming Cart View */}
+        {streamingCart && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                {streamingCart.restaurantName}
+              </h1>
+              {!streamingCart.isComplete && (
+                <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+                  <span>Loading menu items...</span>
+                </div>
+              )}
+              {streamingCart.isComplete && (
+                <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>Complete! Redirecting...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Menu Items by Category */}
+            <div className="space-y-6">
+              {groupedStreamingItems && Object.keys(groupedStreamingItems).sort().map((category) => (
+                <div key={category}>
+                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
+                    {category}
+                  </h2>
+                  <div className="space-y-2">
+                    {groupedStreamingItems[category].map((item, idx) => (
+                      <div
+                        key={`${item.name}-${idx}`}
+                        className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 menu-item-card"
+                        style={{ animationDelay: `${idx * 50}ms` }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                              {item.name}
+                            </h3>
+                            {item.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100 ml-3">
+                            ${item.price?.toFixed(2) || '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+              {streamingCart.items.length} items loaded
+            </div>
+          </div>
+        )}
+
+        {!streamingCart && (
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-8">
+            Powered by Claude AI for intelligent menu parsing
+          </p>
+        )}
       </main>
     </div>
   );
