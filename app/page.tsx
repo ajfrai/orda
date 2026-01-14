@@ -85,12 +85,43 @@ export default function Home() {
       } catch (fetchError) {
         // Network error - fetch itself failed
         const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
+
+        // Provide more helpful error message for common cases
+        if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
+          throw new Error(
+            `Network request failed. This could be due to:\n` +
+            `• CORS restrictions on the PDF URL\n` +
+            `• The PDF URL is not publicly accessible\n` +
+            `• Network connectivity issues\n` +
+            `• The server blocking the request\n\n` +
+            `Try:\n` +
+            `• Using a different PDF URL\n` +
+            `• Uploading the file directly instead\n` +
+            `• Checking if the URL is publicly accessible in your browser`
+          );
+        }
+
         throw new Error(`Network request failed: ${errorMsg}`);
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
+
+        // Try to parse error as JSON for better error messages
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // Not JSON, use raw text
+          if (errorText) {
+            errorMessage += ` - ${errorText}`;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
 
       // Handle streaming response
@@ -102,11 +133,17 @@ export default function Home() {
       }
 
       let buffer = '';
+      let hasReceivedData = false;
 
       while (true) {
         const { done, value } = await reader.read();
 
-        if (done) break;
+        if (done) {
+          if (!hasReceivedData) {
+            throw new Error('Stream ended without receiving any data');
+          }
+          break;
+        }
 
         // Decode chunk and add to buffer
         buffer += decoder.decode(value, { stream: true });
@@ -122,6 +159,7 @@ export default function Home() {
           }
 
           if (line.startsWith('data: ')) {
+            hasReceivedData = true;
             const data = JSON.parse(line.substring(6));
 
             // Handle different event types

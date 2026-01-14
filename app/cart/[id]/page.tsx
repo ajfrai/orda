@@ -22,6 +22,7 @@ export default function CartPage() {
   const [error, setError] = useState<string | null>(null);
   const [streamingComplete, setStreamingComplete] = useState(false);
   const previousItemCount = useRef(0);
+  const noChangeCount = useRef(0);
 
   useEffect(() => {
     async function fetchCart() {
@@ -33,6 +34,7 @@ export default function CartPage() {
         }
         const cartData = await response.json();
         setData(cartData);
+        previousItemCount.current = cartData.menu.items.length;
         setLoading(false);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
@@ -64,16 +66,23 @@ export default function CartPage() {
           console.log('[DEBUG] New items detected:', currentItemCount, 'vs', previousItemCount.current);
           setData(cartData);
           previousItemCount.current = currentItemCount;
-        }
+          noChangeCount.current = 0; // Reset no-change counter
+        } else {
+          noChangeCount.current += 1;
 
-        // Stop polling after 30 seconds or when we haven't received new items for 5 polls
-        // This is a simple heuristic - in production you'd want a better signal
+          // Stop polling if no changes for 10 consecutive polls (5 seconds)
+          if (noChangeCount.current >= 10) {
+            console.log('[DEBUG] No new items for 5 seconds, streaming complete');
+            setStreamingComplete(true);
+            clearInterval(pollInterval);
+          }
+        }
       } catch (err) {
         console.error('Error polling for updates:', err);
       }
     }, 500); // Poll every 500ms
 
-    // Stop polling after 60 seconds
+    // Stop polling after 60 seconds as fallback
     const timeout = setTimeout(() => {
       console.log('[DEBUG] Stopping polling after timeout');
       setStreamingComplete(true);
