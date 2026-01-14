@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { Menu, MenuItem, Cart, CartItem } from '@/types';
+import MenuItemCard from '@/app/components/MenuItemCard';
 
 interface CartResponse {
   cart: Cart;
@@ -92,52 +93,31 @@ export default function CartPage() {
 
               {/* Menu Items by Category */}
               <div className="space-y-8">
-                {categories.map((category) => (
-                  <div key={category}>
-                    <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                      {category}
-                    </h2>
-                    <div className="space-y-3">
-                      {groupedItems![category].map((item, idx) => (
-                        <div
-                          key={`${item.name}-${idx}`}
-                          className="flex justify-between items-start p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                                {item.name}
-                              </h3>
-                              {/* Dietary indicators */}
-                              <div className="flex gap-1 text-xs">
-                                {item.is_spicy && <span title="Spicy">🌶️</span>}
-                                {item.is_vegetarian && <span title="Vegetarian">🥬</span>}
-                                {item.is_vegan && <span title="Vegan">🌱</span>}
-                                {item.is_gluten_free && <span title="Gluten Free">🌾</span>}
-                                {item.is_kosher && <span title="Kosher">✡️</span>}
-                              </div>
-                            </div>
-                            {item.description && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {item.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="text-right ml-4">
-                            <p className="font-semibold text-gray-900 dark:text-gray-100">
-                              ${item.price.toFixed(2)}
-                            </p>
-                            {item.is_estimate && (
-                              <p className="text-xs text-amber-600 dark:text-amber-400">
-                                estimate
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                {categories.map((category) => {
+                  // Calculate the starting index for this category
+                  const previousCategories = categories.slice(0, categories.indexOf(category));
+                  const globalStartIndex = previousCategories.reduce(
+                    (sum, cat) => sum + groupedItems![cat].length,
+                    0
+                  );
+
+                  return (
+                    <div key={category}>
+                      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
+                        {category}
+                      </h2>
+                      <div className="space-y-3">
+                        {groupedItems![category].map((item, idx) => (
+                          <MenuItemCard
+                            key={`${item.name}-${idx}`}
+                            item={item}
+                            index={globalStartIndex + idx}
+                          />
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Cart Items Section */}
