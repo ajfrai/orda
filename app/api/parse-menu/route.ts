@@ -5,14 +5,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePdfUrl } from '@/lib/url-validator';
-import { analyzeMenuPdf, analyzeMenuFromUpload } from '@/lib/claude';
+import { analyzeMenuPdf, analyzeMenuFromUpload, analyzeMenuWithProgress, type ProgressEvent } from '@/lib/claude';
 import { getTaxRate } from '@/lib/tax-rates';
 import { getServiceRoleClient } from '@/lib/supabase';
 import type { ParseMenuRequest, ParseMenuResponse } from '@/types';
 
+interface FileData {
+  base64: string;
+  mediaType: string;
+  isDocument: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
+    const acceptHeader = request.headers.get('accept') || '';
+    const useStreaming = acceptHeader.includes('text/event-stream');
+
+    // If streaming is requested, use streaming endpoint
+    if (useStreaming) {
+      return handleStreamingRequest(request, contentType);
+    }
+
+    // Original non-streaming logic
     let analysis;
     let sourceUrl: string | null = null;
 
@@ -99,6 +114,11 @@ export async function POST(request: NextRequest) {
         description: item.description || null,
         price: item.price || 0,
         is_estimate: item.isEstimate,
+        is_spicy: item.isSpicy || false,
+        is_vegetarian: item.isVegetarian || false,
+        is_vegan: item.isVegan || false,
+        is_gluten_free: item.isGlutenFree || false,
+        is_kosher: item.isKosher || false,
       }))
     );
 
@@ -160,4 +180,221 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Handle streaming request with progress updates
+ */
+async function handleStreamingRequest(request: NextRequest, contentType: string) {
+  const encoder = new TextEncoder();
+
+  // Create a ReadableStream for Server-Sent Events
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        let fileData: FileData;
+        let sourceUrl: string | null = null;
+
+        // Helper to send SSE message
+        const sendEvent = (event: string, data: any) => {
+          const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        };
+
+        // Parse file data based on content type
+        if (contentType.includes('multipart/form-data')) {
+          // Handle file upload
+          const formData = await request.formData();
+          const file = formData.get('file') as File;
+
+          if (!file) {
+            sendEvent('error', { error: 'No file provided' });
+            controller.close();
+            return;
+          }
+
+          // Validate file
+          const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+          if (!validTypes.includes(file.type)) {
+            sendEvent('error', { error: 'Invalid file type. Please upload a PDF or image file.' });
+            controller.close();
+            return;
+          }
+
+          if (file.size > 10 * 1024 * 1024) {
+            sendEvent('error', { error: 'File is too large. Maximum size is 10MB.' });
+            controller.close();
+            return;
+          }
+
+          // Convert to FileData
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          fileData = {
+            base64: buffer.toString('base64'),
+            mediaType: file.type,
+            isDocument: file.type === 'application/pdf',
+          };
+        } else {
+          // Handle URL
+          const body: ParseMenuRequest = await request.json();
+          const { pdfUrl } = body;
+
+          // Validate URL
+          const validation = validatePdfUrl(pdfUrl);
+          if (!validation.valid) {
+            sendEvent('error', { error: validation.error });
+            controller.close();
+            return;
+          }
+
+          sourceUrl = pdfUrl;
+
+          // Fetch file data
+          sendEvent('status', { message: 'Fetching menu file...' });
+
+          const response = await fetch(pdfUrl, {
+            headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
+            signal: AbortSignal.timeout(30000),
+          });
+
+          if (!response.ok) {
+            sendEvent('error', { error: `Failed to fetch file: ${response.status}` });
+            controller.close();
+            return;
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          const contentTypeHeader = response.headers.get('content-type') || '';
+
+          let mediaType = contentTypeHeader;
+          let isDocument = false;
+
+          if (contentTypeHeader.includes('pdf')) {
+            mediaType = 'application/pdf';
+            isDocument = true;
+          } else if (contentTypeHeader.includes('jpeg') || contentTypeHeader.includes('jpg')) {
+            mediaType = 'image/jpeg';
+          } else if (contentTypeHeader.includes('png')) {
+            mediaType = 'image/png';
+          }
+
+          fileData = {
+            base64: buffer.toString('base64'),
+            mediaType,
+            isDocument,
+          };
+        }
+
+        // Analyze menu with progress updates
+        const result = await analyzeMenuWithProgress(fileData, (event: ProgressEvent) => {
+          if (event.type === 'status') {
+            sendEvent('status', { message: event.message });
+          } else if (event.type === 'progress') {
+            sendEvent('progress', { current: event.current, total: event.total });
+          } else if (event.type === 'error') {
+            sendEvent('error', { error: event.error });
+          }
+        });
+
+        // Check if valid menu
+        if (!result.isMenu) {
+          sendEvent('error', { error: result.error || 'This file does not appear to be a restaurant menu.' });
+          controller.close();
+          return;
+        }
+
+        if (!result.restaurantName || !result.categories || result.categories.length === 0) {
+          sendEvent('error', { error: 'Could not extract menu information from file' });
+          controller.close();
+          return;
+        }
+
+        // Get tax rate
+        sendEvent('status', { message: 'Calculating tax rate...' });
+        const taxRate = getTaxRate(result.location?.state);
+
+        // Flatten categories
+        const menuItems = result.categories.flatMap((category) =>
+          category.items.map((item) => ({
+            category: category.category,
+            name: item.name,
+            description: item.description || null,
+            price: item.price || 0,
+            is_estimate: item.isEstimate,
+            is_spicy: item.isSpicy || false,
+            is_vegetarian: item.isVegetarian || false,
+            is_vegan: item.isVegan || false,
+            is_gluten_free: item.isGlutenFree || false,
+            is_kosher: item.isKosher || false,
+          }))
+        );
+
+        // Create database records
+        sendEvent('status', { message: 'Saving menu to database...' });
+
+        const supabase = getServiceRoleClient();
+
+        const { data: menu, error: menuError } = await supabase
+          .from('menus')
+          .insert({
+            pdf_url: sourceUrl || null,
+            restaurant_name: result.restaurantName,
+            location_city: result.location?.city || null,
+            location_state: result.location?.state || null,
+            tax_rate: taxRate,
+            items: menuItems,
+          })
+          .select()
+          .single();
+
+        if (menuError) {
+          console.error('Error creating menu:', menuError);
+          sendEvent('error', { error: 'Failed to save menu data' });
+          controller.close();
+          return;
+        }
+
+        const { data: cart, error: cartError } = await supabase
+          .from('carts')
+          .insert({
+            menu_id: menu.id,
+            tip_percentage: 18,
+          })
+          .select()
+          .single();
+
+        if (cartError) {
+          console.error('Error creating cart:', cartError);
+          sendEvent('error', { error: 'Failed to create cart' });
+          controller.close();
+          return;
+        }
+
+        // Send success
+        sendEvent('complete', {
+          cartId: cart.id,
+          restaurantName: menu.restaurant_name,
+        });
+
+        controller.close();
+      } catch (error) {
+        console.error('Error in streaming request:', error);
+        const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+        const message = `event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`;
+        controller.enqueue(encoder.encode(message));
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
 }
