@@ -9,6 +9,7 @@ export default function Home() {
   const [menuUrl, setMenuUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -16,21 +17,23 @@ export default function Home() {
       // Validate file type
       const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!validTypes.includes(file.type)) {
-        alert('Please select a PDF or image file (JPG, PNG, GIF, WebP)');
+        setErrorDetails(`Invalid file type: ${file.type}\nAccepted types: ${validTypes.join(', ')}`);
         return;
       }
       // Validate file size (10MB)
       if (file.size > 10 * 1024 * 1024) {
-        alert('File is too large. Maximum size is 10MB.');
+        setErrorDetails(`File too large: ${(file.size / 1024 / 1024).toFixed(2)} MB\nMaximum size: 10 MB`);
         return;
       }
       setSelectedFile(file);
+      setErrorDetails(null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorDetails(null);
 
     try {
       let body: any;
@@ -43,7 +46,7 @@ export default function Home() {
       } else {
         // Send file as FormData
         if (!selectedFile) {
-          alert('Please select a file');
+          setErrorDetails('No file selected');
           setIsLoading(false);
           return;
         }
@@ -53,16 +56,44 @@ export default function Home() {
         // Don't set Content-Type header for FormData - browser will set it with boundary
       }
 
+      console.log('[DEBUG] Sending request to /api/parse-menu');
+      console.log('[DEBUG] Mode:', mode);
+      console.log('[DEBUG] Headers:', headers);
+
       const response = await fetch('/api/parse-menu', {
         method: 'POST',
         headers,
         body,
       });
 
-      const data = await response.json();
+      console.log('[DEBUG] Response status:', response.status);
+      console.log('[DEBUG] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const contentType = response.headers.get('content-type');
+      let data;
+
+      if (contentType?.includes('application/json')) {
+        data = await response.json();
+        console.log('[DEBUG] Response data:', data);
+      } else {
+        const text = await response.text();
+        console.log('[DEBUG] Response text:', text);
+        data = { error: 'Non-JSON response: ' + text.substring(0, 200) };
+      }
 
       if (!response.ok) {
-        alert(data.error || 'Failed to process menu');
+        const errorMessage = data.error || 'Failed to process menu';
+        const debugInfo = `
+Status: ${response.status}
+Error: ${errorMessage}
+Mode: ${mode}
+${mode === 'upload' ? `File: ${selectedFile?.name} (${selectedFile?.type})` : `URL: ${menuUrl}`}
+
+Full response:
+${JSON.stringify(data, null, 2)}
+        `.trim();
+
+        setErrorDetails(debugInfo);
         setIsLoading(false);
         return;
       }
@@ -70,8 +101,23 @@ export default function Home() {
       // Redirect to cart page
       window.location.href = `/cart/${data.cartId}`;
     } catch (error) {
-      console.error('Error creating cart:', error);
-      alert('An error occurred while processing the menu. Please try again.');
+      console.error('[DEBUG] Error creating cart:', error);
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : '';
+
+      const debugInfo = `
+Caught Exception: ${errorMessage}
+
+Stack trace:
+${stack}
+
+Request details:
+- Mode: ${mode}
+- ${mode === 'upload' ? `File: ${selectedFile?.name} (${selectedFile?.type}, ${(selectedFile?.size || 0) / 1024} KB)` : `URL: ${menuUrl}`}
+      `.trim();
+
+      setErrorDetails(debugInfo);
       setIsLoading(false);
     }
   };
@@ -119,6 +165,28 @@ export default function Home() {
               Paste URL
             </button>
           </div>
+
+          {errorDetails && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="text-red-600 dark:text-red-400 mt-0.5">⚠️</div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-red-800 dark:text-red-200 mb-2">
+                    Debug Information (will be removed in production)
+                  </h4>
+                  <pre className="text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap font-mono overflow-x-auto">
+                    {errorDetails}
+                  </pre>
+                  <button
+                    onClick={() => setErrorDetails(null)}
+                    className="mt-3 text-xs text-red-600 dark:text-red-400 hover:underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {mode === 'upload' ? (
