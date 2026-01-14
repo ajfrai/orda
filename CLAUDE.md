@@ -14,23 +14,20 @@ No need to re-read it during the session unless specifically asked.
 
 ## Git Workflow
 
-**Push directly to `claude/main` branch** - no PRs needed.
+Claude Code works on session-specific branches (e.g., `claude/feature-name-ABC123`).
 
-This is a hobby project with just two collaborators (human + AI), so we skip the PR process:
-- Develop on `claude/main` branch
-- Commit frequently with clear messages
-- Push directly to `claude/main` after commits
-- No need to create feature branches or pull requests
-
-Branch naming: Use `claude/main` as the primary branch (allows AI assistant to push directly)
+- Claude commits frequently with clear, descriptive messages
+- Claude references issue numbers in commits (e.g., "Implements #3")
+- Claude pushes to its session branch when work is complete
+- User merges PRs when ready
 
 ## Development Practices
 
 - Follow the recommended build order in `PROGRESS.md`
 - Update `PROGRESS.md` session log after completing tasks
 - Test locally before pushing when possible
-- Use clear, descriptive commit messages
-- Reference issue numbers in commits (e.g., "Implements #3")
+- Avoid over-engineering - keep solutions simple and focused
+- Only make changes that are directly requested or clearly necessary
 
 ## Environment
 
@@ -43,5 +40,4 @@ Branch naming: Use `claude/main` as the primary branch (allows AI assistant to p
 Check these files first:
 - `PROGRESS.md` - Current status and history
 - `PLAN.md` - Architecture and design decisions
-- `TESTING.md` - How to test the setup
 - `README.md` - Quick start guide
