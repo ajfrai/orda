@@ -289,25 +289,51 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
 
           sourceUrl = pdfUrl;
 
-          // Fetch file data
+          // Fetch file data with retry logic
           sendEvent('status', { message: 'Fetching menu file...' });
 
           let response;
-          try {
-            response = await fetch(pdfUrl, {
-              headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
-              signal: AbortSignal.timeout(30000),
-            });
-          } catch (fetchError) {
+          let lastError;
+          const maxRetries = 2;
+
+          for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+              if (attempt > 0) {
+                sendEvent('status', { message: `Retrying... (attempt ${attempt + 1}/${maxRetries + 1})` });
+                // Wait before retrying (exponential backoff: 1s, 2s)
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+              }
+
+              response = await fetch(pdfUrl, {
+                headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
+                signal: AbortSignal.timeout(30000),
+              });
+
+              // Success! Break out of retry loop
+              break;
+            } catch (fetchError) {
+              lastError = fetchError;
+              // If this is not the last attempt, continue to retry
+              if (attempt < maxRetries) {
+                continue;
+              }
+            }
+          }
+
+          // If we exhausted all retries, handle the error
+          if (!response) {
+            const fetchError = lastError;
             const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
             let userMessage = 'Failed to fetch file from URL.';
 
             if (errorMsg.includes('aborted') || errorMsg.includes('timeout')) {
               userMessage = 'Request timeout: The file took too long to download (30s limit). The server may be slow or the file may be too large.';
-            } else if (errorMsg.includes('CORS') || errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
-              userMessage = 'Cannot access this URL due to CORS restrictions or network blocking. Try uploading the file directly instead.';
+            } else if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
+              userMessage = 'Network request failed. This is usually temporary - the server may be rate limiting, temporarily unavailable, or experiencing issues. Wait a minute and try again, or upload the file directly.';
+            } else if (errorMsg.includes('CORS')) {
+              userMessage = 'CORS error: The server is blocking cross-origin requests. Try uploading the file directly instead.';
             } else {
-              userMessage = `Network error: ${errorMsg}. The URL may not be publicly accessible.`;
+              userMessage = `Network error: ${errorMsg}. Try uploading the file directly instead.`;
             }
 
             sendEvent('error', { error: userMessage });

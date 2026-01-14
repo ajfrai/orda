@@ -89,15 +89,15 @@ export default function Home() {
         // Provide more helpful error message for common cases
         if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
           throw new Error(
-            `Network request failed. This could be due to:\n` +
-            `• CORS restrictions on the PDF URL\n` +
-            `• The PDF URL is not publicly accessible\n` +
+            `Network request failed. This is usually temporary and could be:\n` +
+            `• Rate limiting by the server (too many requests)\n` +
             `• Network connectivity issues\n` +
-            `• The server blocking the request\n\n` +
+            `• Server temporarily unavailable\n` +
+            `• Request timeout\n\n` +
             `Try:\n` +
-            `• Using a different PDF URL\n` +
-            `• Uploading the file directly instead\n` +
-            `• Checking if the URL is publicly accessible in your browser`
+            `• Wait a minute and try again\n` +
+            `• Upload the file directly instead\n` +
+            `• Check if the URL still works in your browser`
           );
         }
 
