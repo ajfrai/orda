@@ -27,6 +27,7 @@ Real-time enabled on `cart_items` table.
 
 ### Code
 - [x] TypeScript type definitions (`types/index.ts`) - Menu, Cart, CartItem models + API types
+- [x] Supabase client library (`lib/supabase.ts`) - Client/server connections, helpers, real-time subscriptions
 
 ## What's Not Done
 
@@ -95,3 +96,9 @@ Required in `.env.local` and Vercel:
   - Created `types/index.ts` with Menu, Cart, CartItem interfaces
   - Added API request/response types
   - Defined UI helper types and tip presets
+- Completed #2: Supabase client library
+  - Created `lib/supabase.ts` with client and service role connections
+  - Added `lib/database.types.ts` for type-safe database queries
+  - Implemented helper functions (getCartWithData, subscribeToCartItems)
+  - Created comprehensive test script with setup guide (TESTING.md)
+  - Added `.env.local.example` template
