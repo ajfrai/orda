@@ -153,33 +153,18 @@ async function analyzeMenuWithClaude(fileData: FileData): Promise<MenuAnalysisRe
       type: 'text',
       text: `Please analyze this ${fileData.isDocument ? 'PDF' : 'image'} and determine if it's a restaurant menu.
 
-If it IS a restaurant menu, extract the following information and respond with valid JSON:
-{
-  "isMenu": true,
-  "restaurantName": "Name of the restaurant",
-  "location": {
-    "city": "City name (if available)",
-    "state": "State abbreviation (e.g. CA, NY, TX)"
-  },
-  "categories": [
-    {
-      "category": "Category name (e.g. Appetizers, Entrees, Desserts)",
-      "items": [
-        {
-          "name": "Item name",
-          "description": "Brief description (optional)",
-          "price": 12.99,
-          "isEstimate": false,
-          "isSpicy": false,
-          "isVegetarian": false,
-          "isVegan": false,
-          "isGlutenFree": false,
-          "isKosher": false
-        }
-      ]
-    }
-  ]
-}
+If it IS a restaurant menu, respond with a STREAM of individual JSON objects, one per line:
+
+First, output the metadata:
+{"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
+
+Then, output each menu item as a separate JSON object:
+{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "isSpicy": true, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+{"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+
+Finally, output a completion marker:
+{"type": "complete"}
 
 DIETARY INDICATORS:
 - Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
@@ -187,21 +172,18 @@ DIETARY INDICATORS:
 - Set isVegan: true for items with no animal products (stricter than vegetarian)
 - Set isGlutenFree: true for items marked as gluten-free or naturally gluten-free
 - Set isKosher: true for items marked with kosher symbols (K, OU, etc.)
-- If a dietary property isn't explicitly indicated, set it to false or omit it
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
 
 If it is NOT a restaurant menu, respond with:
-{
-  "isMenu": false,
-  "error": "This PDF does not appear to be a restaurant menu."
-}
+{"type": "error", "message": "This does not appear to be a restaurant menu."}
 
-IMPORTANT:
-- Respond with ONLY the JSON object, no other text
-- Ensure all strings are properly escaped (use \\" for quotes within strings, \\n for newlines)
-- The JSON must be valid and parseable`,
+CRITICAL:
+- Output ONE JSON object per line
+- Each JSON object must be complete and valid
+- No markdown code blocks, no extra text
+- Start streaming items immediately after metadata`,
     });
 
     // Call Claude API
@@ -216,41 +198,67 @@ IMPORTANT:
       ],
     });
 
-    // Parse Claude's response
+    // Parse Claude's response (line-by-line JSON format)
     const textContent = message.content.find((block) => block.type === 'text');
     if (!textContent || textContent.type !== 'text') {
       throw new Error('No text response from Claude');
     }
 
-    // Extract JSON from response (handle potential markdown code blocks)
     jsonText = textContent.text.trim();
 
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    // Parse line-by-line JSON objects
+    const lines = jsonText.split('\n');
+    let restaurantName: string | undefined;
+    let location: { city?: string; state?: string } | undefined;
+    const categoriesMap: Map<string, MenuItem[]> = new Map();
+
+    for (const line of lines) {
+      const obj = parseStreamingJsonLine(line);
+      if (!obj) continue;
+
+      if (obj.type === 'metadata') {
+        restaurantName = obj.restaurantName;
+        location = obj.location;
+      } else if (obj.type === 'item') {
+        if (!categoriesMap.has(obj.category)) {
+          categoriesMap.set(obj.category, []);
+        }
+        categoriesMap.get(obj.category)!.push({
+          name: obj.name,
+          description: obj.description,
+          price: obj.price,
+          isEstimate: obj.isEstimate,
+          isSpicy: obj.isSpicy,
+          isVegetarian: obj.isVegetarian,
+          isVegan: obj.isVegan,
+          isGlutenFree: obj.isGlutenFree,
+          isKosher: obj.isKosher,
+        });
+      } else if (obj.type === 'error') {
+        return { isMenu: false, error: obj.message };
+      }
     }
 
-    // Try to parse JSON with better error handling
-    let result: MenuAnalysisResult;
-    try {
-      result = JSON.parse(jsonText) as MenuAnalysisResult;
-    } catch (parseError) {
-      // If JSON parsing fails, provide detailed error info
-      const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
-      console.error('[DEBUG] JSON parse failed:', errorMsg);
-      console.error('[DEBUG] Problematic JSON text (first 500 chars):', jsonText.substring(0, 500));
-      console.error('[DEBUG] Problematic JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)));
-
-      throw new Error(`JSON parsing failed: ${errorMsg}. This may be due to malformed JSON in Claude's response. Check the debug logs for the raw response.`);
+    if (!restaurantName) {
+      throw new Error('No metadata received from Claude');
     }
 
-    console.log('[DEBUG] Claude analysis complete, isMenu:', result.isMenu);
-    if (result.isMenu) {
-      console.log('[DEBUG] Restaurant:', result.restaurantName);
-      console.log('[DEBUG] Categories:', result.categories?.length);
-    }
+    // Convert map to categories array
+    const categories: MenuCategory[] = Array.from(categoriesMap.entries()).map(([category, items]) => ({
+      category,
+      items,
+    }));
+
+    const result: MenuAnalysisResult = {
+      isMenu: true,
+      restaurantName,
+      location,
+      categories,
+    };
+
+    console.log('[DEBUG] Claude analysis complete');
+    console.log('[DEBUG] Restaurant:', result.restaurantName);
+    console.log('[DEBUG] Categories:', result.categories?.length);
 
     return result;
   } catch (error) {
@@ -340,143 +348,19 @@ export type ProgressEvent =
   | { type: 'error'; error: string };
 
 /**
- * Helper function to try extracting data from incomplete JSON
- * Returns metadata and new items that haven't been emitted yet
+ * Parse streaming JSON objects line-by-line
+ * Each line should be a complete JSON object
  */
-function tryExtractData(
-  jsonText: string,
-  alreadyEmittedCount: number
-): {
-  metadata?: { restaurantName: string; location?: { city?: string; state?: string } };
-  items: Array<{ item: MenuItem; category: string }>;
-} {
-  try {
-    // Clean up markdown code blocks if present
-    let cleanedText = jsonText.trim();
-    if (cleanedText.startsWith('```json')) {
-      cleanedText = cleanedText.replace(/^```json\n?/, '');
-    } else if (cleanedText.startsWith('```')) {
-      cleanedText = cleanedText.replace(/^```\n?/, '');
-    }
-
-    // Try to parse as-is first
-    let parsed: Partial<MenuAnalysisResult>;
-    try {
-      parsed = JSON.parse(cleanedText);
-    } catch (parseError) {
-      // If parsing fails, try to fix incomplete JSON by closing structures
-      const fixed = attemptToFixIncompleteJson(cleanedText);
-      if (!fixed) {
-        return { items: [] };
-      }
-
-      try {
-        parsed = JSON.parse(fixed);
-      } catch {
-        return { items: [] };
-      }
-    }
-
-    // Extract metadata
-    let metadata: { restaurantName: string; location?: { city?: string; state?: string } } | undefined;
-    if (parsed.restaurantName) {
-      metadata = {
-        restaurantName: parsed.restaurantName,
-        location: parsed.location,
-      };
-    }
-
-    // Extract items from categories
-    const allItems: Array<{ item: MenuItem; category: string }> = [];
-    if (parsed.categories && Array.isArray(parsed.categories)) {
-      for (const category of parsed.categories) {
-        if (!category.items || !Array.isArray(category.items)) {
-          continue;
-        }
-        for (const item of category.items) {
-          allItems.push({ item, category: category.category });
-        }
-      }
-    }
-
-    // Return metadata and only new items
-    return {
-      metadata,
-      items: allItems.slice(alreadyEmittedCount),
-    };
-  } catch (error) {
-    // Silently fail - we'll try again on next chunk
-    return { items: [] };
+function parseStreamingJsonLine(line: string): any | null {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return null;
   }
-}
 
-/**
- * Attempt to fix incomplete JSON by closing open structures
- * This allows us to parse partial JSON as it streams
- */
-function attemptToFixIncompleteJson(json: string): string | null {
   try {
-    // Count open/close braces and brackets to determine what needs closing
-    let openBraces = 0;
-    let openBrackets = 0;
-    let inString = false;
-    let escapeNext = false;
-
-    for (let i = 0; i < json.length; i++) {
-      const char = json[i];
-
-      if (escapeNext) {
-        escapeNext = false;
-        continue;
-      }
-
-      if (char === '\\') {
-        escapeNext = true;
-        continue;
-      }
-
-      if (char === '"') {
-        inString = !inString;
-        continue;
-      }
-
-      if (inString) {
-        continue;
-      }
-
-      if (char === '{') {
-        openBraces++;
-      } else if (char === '}') {
-        openBraces--;
-      } else if (char === '[') {
-        openBrackets++;
-      } else if (char === ']') {
-        openBrackets--;
-      }
-    }
-
-    // If we're in a string, close it
-    let fixed = json;
-    if (inString) {
-      fixed += '"';
-    }
-
-    // Remove trailing incomplete value (e.g., `"price": 12.9` -> `"price": 12.9`)
-    // Look for incomplete number or string at the end
-    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*[0-9.]*$/, '');
-    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, '');
-    fixed = fixed.replace(/,\s*"[^"]*"\s*:\s*$/, '');
-
-    // Close arrays and objects
-    for (let i = 0; i < openBrackets; i++) {
-      fixed += ']';
-    }
-    for (let i = 0; i < openBraces; i++) {
-      fixed += '}';
-    }
-
-    return fixed;
+    return JSON.parse(trimmed);
   } catch (error) {
+    console.error('[DEBUG] Failed to parse JSON line:', trimmed);
     return null;
   }
 }
@@ -521,33 +405,18 @@ export async function analyzeMenuWithProgress(
       type: 'text',
       text: `Please analyze this ${fileData.isDocument ? 'PDF' : 'image'} and determine if it's a restaurant menu.
 
-If it IS a restaurant menu, extract the following information and respond with valid JSON:
-{
-  "isMenu": true,
-  "restaurantName": "Name of the restaurant",
-  "location": {
-    "city": "City name (if available)",
-    "state": "State abbreviation (e.g. CA, NY, TX)"
-  },
-  "categories": [
-    {
-      "category": "Category name (e.g. Appetizers, Entrees, Desserts)",
-      "items": [
-        {
-          "name": "Item name",
-          "description": "Brief description (optional)",
-          "price": 12.99,
-          "isEstimate": false,
-          "isSpicy": false,
-          "isVegetarian": false,
-          "isVegan": false,
-          "isGlutenFree": false,
-          "isKosher": false
-        }
-      ]
-    }
-  ]
-}
+If it IS a restaurant menu, respond with a STREAM of individual JSON objects, one per line:
+
+First, output the metadata:
+{"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
+
+Then, output each menu item as a separate JSON object:
+{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "isSpicy": true, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+{"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+
+Finally, output a completion marker:
+{"type": "complete"}
 
 DIETARY INDICATORS:
 - Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
@@ -555,21 +424,18 @@ DIETARY INDICATORS:
 - Set isVegan: true for items with no animal products (stricter than vegetarian)
 - Set isGlutenFree: true for items marked as gluten-free or naturally gluten-free
 - Set isKosher: true for items marked with kosher symbols (K, OU, etc.)
-- If a dietary property isn't explicitly indicated, set it to false or omit it
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
 
 If it is NOT a restaurant menu, respond with:
-{
-  "isMenu": false,
-  "error": "This PDF does not appear to be a restaurant menu."
-}
+{"type": "error", "message": "This does not appear to be a restaurant menu."}
 
-IMPORTANT:
-- Respond with ONLY the JSON object, no other text
-- Ensure all strings are properly escaped (use \\" for quotes within strings, \\n for newlines)
-- The JSON must be valid and parseable`,
+CRITICAL:
+- Output ONE JSON object per line
+- Each JSON object must be complete and valid
+- No markdown code blocks, no extra text
+- Start streaming items immediately after metadata`,
     });
 
     onProgress({ type: 'status', message: 'Sending to Claude AI...' });
@@ -587,9 +453,8 @@ IMPORTANT:
     });
 
     let accumulatedText = '';
+    let lineBuffer = '';
     let tokenCount = 0;
-    let emittedItemCount = 0;
-    let metadataEmitted = false;
 
     onProgress({ type: 'status', message: 'Analyzing menu...' });
 
@@ -597,63 +462,141 @@ IMPORTANT:
     for await (const chunk of stream) {
       if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
         accumulatedText += chunk.delta.text;
+        lineBuffer += chunk.delta.text;
         tokenCount += 1;
 
-        // Try to parse and emit data every 50 tokens
+        // Send progress update every 50 tokens
         if (tokenCount % 50 === 0) {
           onProgress({
             type: 'progress',
             current: tokenCount,
             total: 4096, // max_tokens
           });
+        }
 
-          // Try to parse incomplete JSON and extract data
-          const extracted = tryExtractData(accumulatedText, emittedItemCount);
+        // Check for complete lines (JSON objects)
+        const lines = lineBuffer.split('\n');
 
-          // Emit metadata once when available
-          if (!metadataEmitted && extracted.metadata) {
-            onProgress({
-              type: 'metadata',
-              restaurantName: extracted.metadata.restaurantName,
-              location: extracted.metadata.location,
-            });
-            metadataEmitted = true;
-          }
+        // Keep the last incomplete line in the buffer
+        if (lines.length > 1) {
+          lineBuffer = lines.pop() || '';
 
-          // Emit new items
-          for (const { item, category } of extracted.items) {
-            onProgress({ type: 'item', item, category });
-            emittedItemCount++;
+          // Process each complete line
+          for (const line of lines) {
+            const obj = parseStreamingJsonLine(line);
+            if (!obj) continue;
+
+            if (obj.type === 'metadata') {
+              onProgress({
+                type: 'metadata',
+                restaurantName: obj.restaurantName,
+                location: obj.location,
+              });
+            } else if (obj.type === 'item') {
+              onProgress({
+                type: 'item',
+                item: {
+                  name: obj.name,
+                  description: obj.description,
+                  price: obj.price,
+                  isEstimate: obj.isEstimate,
+                  isSpicy: obj.isSpicy,
+                  isVegetarian: obj.isVegetarian,
+                  isVegan: obj.isVegan,
+                  isGlutenFree: obj.isGlutenFree,
+                  isKosher: obj.isKosher,
+                },
+                category: obj.category,
+              });
+            } else if (obj.type === 'error') {
+              throw new Error(obj.message);
+            }
           }
         }
       }
     }
 
-    onProgress({ type: 'status', message: 'Parsing results...' });
-
-    // Parse the accumulated response
-    let jsonText = accumulatedText.trim();
-
-    // Remove markdown code blocks if present
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```\n?/, '').replace(/\n?```$/, '');
+    // Process any remaining line in buffer
+    if (lineBuffer.trim()) {
+      const obj = parseStreamingJsonLine(lineBuffer);
+      if (obj) {
+        if (obj.type === 'item') {
+          onProgress({
+            type: 'item',
+            item: {
+              name: obj.name,
+              description: obj.description,
+              price: obj.price,
+              isEstimate: obj.isEstimate,
+              isSpicy: obj.isSpicy,
+              isVegetarian: obj.isVegetarian,
+              isVegan: obj.isVegan,
+              isGlutenFree: obj.isGlutenFree,
+              isKosher: obj.isKosher,
+            },
+            category: obj.category,
+          });
+        } else if (obj.type === 'error') {
+          throw new Error(obj.message);
+        }
+      }
     }
 
-    // Try to parse JSON with better error handling
-    let result: MenuAnalysisResult;
-    try {
-      result = JSON.parse(jsonText) as MenuAnalysisResult;
-    } catch (parseError) {
-      // If JSON parsing fails, provide detailed error info
-      const errorMsg = parseError instanceof Error ? parseError.message : 'Unknown parse error';
-      console.error('[DEBUG] JSON parse failed:', errorMsg);
-      console.error('[DEBUG] Problematic JSON text (first 500 chars):', jsonText.substring(0, 500));
-      console.error('[DEBUG] Problematic JSON text (last 500 chars):', jsonText.substring(Math.max(0, jsonText.length - 500)));
+    onProgress({ type: 'status', message: 'Finalizing results...' });
 
-      throw new Error(`JSON parsing failed: ${errorMsg}. This may be due to malformed JSON in Claude's response. Check the debug logs for the raw response.`);
+    // Parse the accumulated response line-by-line to build final result
+    const lines = accumulatedText.trim().split('\n');
+    let restaurantName: string | undefined;
+    let location: { city?: string; state?: string } | undefined;
+    const categoriesMap: Map<string, MenuItem[]> = new Map();
+
+    for (const line of lines) {
+      const obj = parseStreamingJsonLine(line);
+      if (!obj) continue;
+
+      if (obj.type === 'metadata') {
+        restaurantName = obj.restaurantName;
+        location = obj.location;
+      } else if (obj.type === 'item') {
+        if (!categoriesMap.has(obj.category)) {
+          categoriesMap.set(obj.category, []);
+        }
+        categoriesMap.get(obj.category)!.push({
+          name: obj.name,
+          description: obj.description,
+          price: obj.price,
+          isEstimate: obj.isEstimate,
+          isSpicy: obj.isSpicy,
+          isVegetarian: obj.isVegetarian,
+          isVegan: obj.isVegan,
+          isGlutenFree: obj.isGlutenFree,
+          isKosher: obj.isKosher,
+        });
+      } else if (obj.type === 'error') {
+        throw new Error(obj.message);
+      }
     }
+
+    if (!restaurantName) {
+      throw new Error('No metadata received from Claude');
+    }
+
+    // Convert map to categories array
+    const categories: MenuCategory[] = Array.from(categoriesMap.entries()).map(([category, items]) => ({
+      category,
+      items,
+    }));
+
+    const result: MenuAnalysisResult = {
+      isMenu: true,
+      restaurantName,
+      location,
+      categories,
+    };
+
+    console.log('[DEBUG] Claude streaming analysis complete');
+    console.log('[DEBUG] Restaurant:', result.restaurantName);
+    console.log('[DEBUG] Categories:', result.categories?.length);
 
     onProgress({ type: 'complete', result });
 
