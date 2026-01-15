@@ -11,11 +11,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
-  const [progressStages, setProgressStages] = useState({
-    downloading: false,
-    parsing: false,
-    creating: false,
-  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,7 +47,6 @@ export default function Home() {
     e.preventDefault();
     setIsLoading(true);
     setErrorDetails(null);
-    setProgressStages({ downloading: false, parsing: false, creating: false });
 
     try {
       let body: any;
@@ -171,25 +165,6 @@ export default function Home() {
             // Handle different event types
             if (data.error) {
               throw new Error(data.error);
-            }
-
-            // Update progress stages based on status messages
-            if (data.message) {
-              const msg = data.message.toLowerCase();
-
-              if (msg.includes('fetching') || msg.includes('retrying')) {
-                // Downloading from URL
-                setProgressStages({ downloading: false, parsing: false, creating: false });
-              } else if (msg.includes('preparing') || msg.includes('sending to claude') || msg.includes('analyzing')) {
-                // For uploads, skip downloading stage; for URLs, mark downloading complete
-                setProgressStages({ downloading: true, parsing: false, creating: false });
-              } else if (msg.includes('parsing results')) {
-                // Parsing complete
-                setProgressStages({ downloading: true, parsing: true, creating: false });
-              } else if (msg.includes('creating cart') || msg.includes('finalizing')) {
-                // Creating cart
-                setProgressStages({ downloading: true, parsing: true, creating: true });
-              }
             }
 
             // Redirect to cart page as soon as cart is created
@@ -395,50 +370,6 @@ Request details:
                 'Create Cart'
               )}
             </button>
-
-            {isLoading && (
-              <div className="mt-4 space-y-2 text-sm">
-                <div className={`flex items-center gap-2 transition-all ${progressStages.downloading ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {progressStages.downloading ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  )}
-                  <span>Downloading menu</span>
-                </div>
-                <div className={`flex items-center gap-2 transition-all ${progressStages.parsing ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {progressStages.parsing ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  )}
-                  <span>Parsing with AI</span>
-                </div>
-                <div className={`flex items-center gap-2 transition-all ${progressStages.creating ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                  {progressStages.creating ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  )}
-                  <span>Creating cart</span>
-                </div>
-              </div>
-            )}
           </form>
 
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
