@@ -1,91 +1,63 @@
 # Claude Code Assistant Guidelines
 
-## Session Management
+## Session Wrap-Up
 
-### Starting a Session
+When wrapping up a session, update `PROGRESS.md` with:
+- Session entry with today's date
+- Completed tasks with technical details
+- Files created/modified and key decisions
+- "Key Accomplishments" summary
 
-1. **Read context files** in this order:
-   - `PROGRESS.md` - Current development status and session history
-   - `PLAN.md` - Overall architecture and design decisions
-   - Any relevant issue files or documentation
+## User Flow Documentation
 
-2. **Check current branch**:
-   - Verify you're on the correct development branch
-   - Review recent commits to understand latest changes
+When proposing changes to **app user flows** (how users interact with the Orda UI), **always** provide detailed "before" and "after" flow descriptions.
 
-3. **Understand the task**:
-   - Read the user's request carefully
-   - Ask clarifying questions if needed
-   - Review related code before making changes
+### Flow Description Requirements
 
-### During Development
+Each flow description must include:
 
-1. **Use TodoWrite tool** to track multi-step tasks
-   - Create todos at the start of complex work
-   - Mark items in_progress when starting
-   - Mark completed immediately after finishing
-   - Keep only one item in_progress at a time
+1. **Initial State**: What the user sees when they begin
+2. **User Actions**: How they interact (clicks, inputs, gestures)
+3. **State Transitions**: What views/screens they see next
+4. **Intermediate States**: Any loading, validation, or feedback states
+5. **Terminal State**: The final state where the flow completes
 
-2. **Commit frequently**:
-   - Commit logical units of work
-   - Write clear, descriptive commit messages
-   - Include "why" not just "what" in messages
+### Format
 
-3. **Build and test**:
-   - Run `npm run build` to verify TypeScript compilation
-   - Test changes locally when possible
-   - Fix errors immediately before moving forward
+```
+#### Before Flow:
+1. User sees [initial view/screen]
+2. User [performs action]
+3. System [shows/responds with]
+4. User sees [next view]
+5. ... continue until terminal state
 
-### Wrapping Up a Session
+#### After Flow:
+1. User sees [initial view/screen]
+2. User [performs action]
+3. System [shows/responds with]
+4. User sees [next view]
+5. ... continue until terminal state
+```
 
-When the user says "wrap up this session" or similar, follow these steps:
+### Verification Step
 
-1. **Commit all outstanding changes**:
-   - Ensure all work is committed with clear messages
-   - Push to the development branch
+After implementing the app flow change:
+1. Test the actual user flow end-to-end in the app
+2. Write a concise summary of the implemented flow
+3. Compare the actual flow with the original "after" description
+4. Call out any discrepancies between intended and actual behavior
 
-2. **Update PROGRESS.md**:
-   - Add a new session entry with today's date
-   - List all completed tasks with bullet points
-   - Include technical details (files created/modified, key decisions)
-   - Add a "Key Accomplishments" summary section
-   - Be specific about what was built and why
+This ensures the app behavior matches the design intent and prevents misalignment between vision and reality.
 
-3. **Update issue tracking** (if applicable):
-   - Close completed GitHub issues
-   - Update issue comments with progress
-   - Create new issues for discovered work
-
-4. **Final push**:
-   - Push all commits to remote branch
-   - Verify branch is up to date
-
-## Code Style Preferences
-
-- **Avoid over-engineering**: Only add what's explicitly needed
-- **No unnecessary comments**: Code should be self-documenting
-- **No emojis** unless explicitly requested
-- **Error handling**: Comprehensive logging during development, user-friendly in production
-- **Type safety**: Use TypeScript strictly, no `any` types
-- **Security first**: Validate all inputs, sanitize data, use environment variables
-
-## Development Workflow
-
-1. **Read before writing**: Always read existing code before modifying
-2. **Understand before suggesting**: Don't propose changes to unread code
-3. **Test incrementally**: Build after significant changes
-4. **Document decisions**: Update PROGRESS.md with rationale for technical choices
-
-## Project-Specific Guidelines
-
-### Orda App Architecture
+## Architecture
 
 - **Framework**: Next.js 16 with App Router
 - **Database**: Supabase (Postgres) with Row Level Security
 - **AI**: Claude 4.5 Sonnet for menu parsing
 - **Styling**: Tailwind CSS
 
-### Key Security Considerations
+## Security Requirements
 
 - All Claude API calls must be server-side only
 - Validate and sanitize all user inputs
@@ -93,14 +65,14 @@ When the user says "wrap up this session" or similar, follow these steps:
 - Never expose API keys in client code
 - Use service role client only in API routes
 
-### Database Operations
+## Database Operations
 
 - Use `getServiceRoleClient()` for API routes (server-side)
 - Use `supabase` client for client components (RLS enforced)
 - Always handle errors from Supabase operations
 - Include error codes and details in development mode
 
-## Common Patterns
+## Code Patterns
 
 ### API Route Structure
 ```typescript
