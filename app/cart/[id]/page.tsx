@@ -24,6 +24,19 @@ export default function CartPage() {
   const previousItemCount = useRef(0);
   const noChangeCount = useRef(0);
   const [progressStage, setProgressStage] = useState<'downloading' | 'parsing' | 'extracting' | 'complete'>('downloading');
+  const [debugText, setDebugText] = useState<string>('');
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyDebug = async () => {
+    if (!debugText) return;
+    try {
+      await navigator.clipboard.writeText(debugText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   useEffect(() => {
     async function fetchCart() {
@@ -76,6 +89,13 @@ export default function CartPage() {
         if (currentItemCount > previousItemCount.current) {
           console.log('[DEBUG] New items detected:', currentItemCount, 'vs', previousItemCount.current);
           setData(cartData);
+
+          // Update debug text with the latest item
+          const latestItem = cartData.menu.items[cartData.menu.items.length - 1];
+          if (latestItem) {
+            setDebugText(JSON.stringify(latestItem, null, 2));
+          }
+
           previousItemCount.current = currentItemCount;
           noChangeCount.current = 0; // Reset no-change counter
 
@@ -254,6 +274,29 @@ export default function CartPage() {
                         <span>Menu loaded successfully</span>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Debug Output */}
+                {isStreaming && progressStage === 'extracting' && (
+                  <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Debug: Current Item JSON
+                      </h3>
+                      <button
+                        onClick={handleCopyDebug}
+                        className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
+                      >
+                        {isCopied ? '✓ Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-64 overflow-y-auto">
+                      {debugText || 'Waiting for next item...'}
+                    </pre>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      Shows the JSON for each item as it streams in. Container persists, text updates.
+                    </p>
                   </div>
                 )}
               </div>
