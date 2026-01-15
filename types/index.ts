@@ -29,7 +29,7 @@ export interface Menu {
 
 export interface Cart {
   id: string;
-  menu_id: string;
+  menu_id: string | null;
   created_at: string;
   tip_percentage: number;
 }
