@@ -10,6 +10,19 @@ export default function CreatingCartPage() {
   const [progressStage, setProgressStage] = useState<ProgressStage>('downloading');
   const [error, setError] = useState<string | null>(null);
   const [itemCount, setItemCount] = useState(0);
+  const [debugText, setDebugText] = useState<string>('');
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyDebug = async () => {
+    if (!debugText) return;
+    try {
+      await navigator.clipboard.writeText(debugText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   useEffect(() => {
     async function createCart() {
@@ -97,6 +110,9 @@ export default function CreatingCartPage() {
               hasReceivedData = true;
               const data = JSON.parse(line.substring(6));
 
+              // DEBUG: Append raw JSON to debug text
+              setDebugText(prev => prev + JSON.stringify(data, null, 2) + '\n\n');
+
               if (data.error) {
                 throw new Error(data.error);
               }
@@ -116,6 +132,8 @@ export default function CreatingCartPage() {
                   // First item received, move to extracting stage
                   setProgressStage('extracting');
                   setItemCount(1);
+                  // Clear debug text when item is parsed
+                  setDebugText('');
                 } else if (!data.item && !data.message) {
                   // Complete event
                   setProgressStage('complete');
@@ -129,6 +147,8 @@ export default function CreatingCartPage() {
               } else if (data.item && cartId) {
                 // Subsequent items
                 setItemCount(prev => prev + 1);
+                // Clear debug text when item is parsed
+                setDebugText('');
               }
             }
           }
@@ -263,6 +283,29 @@ export default function CreatingCartPage() {
                   </div>
                 )}
               </div>
+
+              {/* Debug Output */}
+              {debugText && (
+                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Debug: Streaming Output
+                    </h3>
+                    <button
+                      onClick={handleCopyDebug}
+                      className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
+                    >
+                      {isCopied ? '✓ Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-96 overflow-y-auto">
+                    {debugText}
+                  </pre>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    This debug view shows raw streaming output and will be removed in production.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>
