@@ -23,7 +23,7 @@ export default function CartPage() {
   const [streamingComplete, setStreamingComplete] = useState(false);
   const previousItemCount = useRef(0);
   const noChangeCount = useRef(0);
-  const [progressStage, setProgressStage] = useState<'downloading' | 'parsing' | 'extracting' | 'complete'>('downloading');
+  const [progressStage, setProgressStage] = useState<'extracting' | 'complete'>('extracting');
   const [debugText, setDebugText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
 
@@ -49,15 +49,6 @@ export default function CartPage() {
         const cartData = await response.json();
         setData(cartData);
         previousItemCount.current = cartData.menu.items.length;
-
-        // Update progress stage based on item count
-        if (isStreaming) {
-          if (cartData.menu.items.length === 0) {
-            setProgressStage('parsing');
-          } else if (cartData.menu.items.length > 0) {
-            setProgressStage('extracting');
-          }
-        }
 
         setLoading(false);
       } catch (err) {
@@ -98,11 +89,6 @@ export default function CartPage() {
 
           previousItemCount.current = currentItemCount;
           noChangeCount.current = 0; // Reset no-change counter
-
-          // Update progress stage
-          if (currentItemCount > 0) {
-            setProgressStage('extracting');
-          }
         } else {
           noChangeCount.current += 1;
 
@@ -190,53 +176,6 @@ export default function CartPage() {
                 )}
                 {isStreaming && (
                   <div className="mt-4 space-y-2 text-sm">
-                    {/* Downloading menu */}
-                    <div className={`flex items-center gap-2 transition-all ${
-                      progressStage === 'downloading'
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : progressStage === 'parsing' || progressStage === 'extracting' || progressStage === 'complete'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-gray-500'
-                    }`}>
-                      {progressStage === 'downloading' ? (
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                      <span>Downloading menu</span>
-                    </div>
-
-                    {/* Sending to Claude */}
-                    <div className={`flex items-center gap-2 transition-all ${
-                      progressStage === 'parsing'
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : progressStage === 'extracting' || progressStage === 'complete'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-gray-500'
-                    }`}>
-                      {progressStage === 'parsing' ? (
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      ) : progressStage === 'extracting' || progressStage === 'complete' ? (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 animate-spin opacity-0" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                      )}
-                      <span>Sending menu to Claude</span>
-                    </div>
-
                     {/* Extracting menu items */}
                     <div className={`flex items-center gap-2 transition-all ${
                       progressStage === 'extracting'
