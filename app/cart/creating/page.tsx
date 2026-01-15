@@ -12,6 +12,7 @@ export default function CreatingCartPage() {
   const [itemCount, setItemCount] = useState(0);
   const [debugText, setDebugText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
+  const [streamedItems, setStreamedItems] = useState<Array<{ item: any; category: string }>>([]);
 
   const handleCopyDebug = async () => {
     if (!debugText) return;
@@ -110,9 +111,6 @@ export default function CreatingCartPage() {
               hasReceivedData = true;
               const data = JSON.parse(line.substring(6));
 
-              // DEBUG: Append raw JSON to debug text
-              setDebugText(prev => prev + JSON.stringify(data, null, 2) + '\n\n');
-
               if (data.error) {
                 throw new Error(data.error);
               }
@@ -125,15 +123,19 @@ export default function CreatingCartPage() {
                 }
               }
 
+              // DEBUG: Show only item JSON (not progress/status messages)
+              if (data.item) {
+                setDebugText(JSON.stringify(data.item, null, 2));
+              }
+
               // Handle cart creation and items
               if (data.cartId) {
                 cartId = data.cartId;
                 if (data.item) {
-                  // First item received, move to extracting stage
+                  // Item received - add to streamed items and show card
+                  setStreamedItems(prev => [...prev, { item: data.item, category: data.category }]);
                   setProgressStage('extracting');
-                  setItemCount(1);
-                  // Clear debug text when item is parsed
-                  setDebugText('');
+                  setItemCount(prev => prev + 1);
                 } else if (!data.item && !data.message) {
                   // Complete event
                   setProgressStage('complete');
@@ -146,9 +148,8 @@ export default function CreatingCartPage() {
                 }
               } else if (data.item && cartId) {
                 // Subsequent items
+                setStreamedItems(prev => [...prev, { item: data.item, category: data.category }]);
                 setItemCount(prev => prev + 1);
-                // Clear debug text when item is parsed
-                setDebugText('');
               }
             }
           }
@@ -285,11 +286,11 @@ export default function CreatingCartPage() {
               </div>
 
               {/* Debug Output */}
-              {debugText && (
+              {progressStage === 'extracting' && (
                 <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      Debug: Streaming Output
+                      Debug: Current Item JSON
                     </h3>
                     <button
                       onClick={handleCopyDebug}
@@ -298,12 +299,50 @@ export default function CreatingCartPage() {
                       {isCopied ? '✓ Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                    {debugText}
+                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-64 overflow-y-auto">
+                    {debugText || 'Waiting for next item...'}
                   </pre>
                   <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    This debug view shows raw streaming output and will be removed in production.
+                    Shows the JSON for each item as it streams in. Container persists, text updates.
                   </p>
+                </div>
+              )}
+
+              {/* Streamed Items */}
+              {streamedItems.length > 0 && (
+                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                    Menu Items ({streamedItems.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {streamedItems.map((itemData, idx) => (
+                      <div
+                        key={`${itemData.item.name}-${idx}`}
+                        className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 transition-all duration-300 ease-in"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                                {itemData.item.name}
+                              </h4>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {itemData.category}
+                              </span>
+                            </div>
+                            {itemData.item.description && (
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                {itemData.item.description}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-semibold text-gray-900 dark:text-gray-100 ml-3">
+                            ${itemData.item.price?.toFixed(2) || '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>
