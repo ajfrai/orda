@@ -151,33 +151,30 @@ Required in `.env.local` and Vercel:
 - Working cart page to verify parsed menu data
 
 ### 2026-01-15 (Session 4)
-- Refactored user flow for immediate progress feedback
-  - Created intermediate `/cart/creating` page showing initial progress indicators
-  - Landing page (`app/page.tsx`) now stores upload data in sessionStorage and redirects instantly
-  - No visible processing delay on landing page - redirect happens immediately
-- Implemented streaming into shareable cart page
-  - Updated `app/cart/[id]/page.tsx` to handle `?streaming=true` query parameter
-  - Database polling (500ms intervals) detects newly parsed menu items
-  - Menu items appear in real-time as Claude extracts them using MenuItemCard components
+- Consolidated streaming flow into single shareable cart page
+  - Created `/api/cart/create` endpoint to create empty carts upfront
+  - Landing page creates cart first, stores upload data in sessionStorage, redirects to `/cart/{id}?streaming=true`
+  - Cart page initiates parse-menu streaming and handles all progress
+  - Removed intermediate `/cart/creating` page entirely
+  - Parse-menu API now accepts optional `cartId` to update existing carts
+- Simplified progress indicators
+  - Shows only "Extracting menu items (X found)" during streaming
+  - Removed "Downloading menu" and "Sending menu to Claude" indicators
+  - Progress accurately reflects database polling for newly parsed items
+  - Changed progress type to `'extracting' | 'complete'`
 - Added debug streaming output feature
   - Shows JSON of each item as it streams in
   - Persistent container with live-updating text content
   - Copy button for debugging Claude API output
   - Filed GitHub issue #43 to remove before production
-- Simplified progress indicators on shareable cart
-  - Removed "Downloading menu" stage (already complete before page loads)
-  - Removed "Sending menu to Claude" stage (already complete before page loads)
-  - Kept only "Extracting menu items (X found)" which accurately reflects database polling
-  - Changed progress type from 4 stages to 2: `'extracting' | 'complete'`
-- Renamed progress stage text from "Parsing with AI" to "Sending menu to Claude"
 - Fixed three streaming bugs:
   - Debug container now persists during streaming (not conditional on text presence)
   - Debug text shows item JSON only, not progress events
   - Cards render in real-time, not all at once after completion
 
 ### Key Accomplishments (Session 4)
+- Single-page streaming architecture: all progress happens on shareable cart URL
 - Zero-delay redirect from landing page for better UX
-- Real-time menu item streaming into shareable cart page
-- Accurate progress indicators that reflect actual system state
+- Real-time menu item streaming with accurate progress indicators
 - Debug tooling for monitoring Claude API streaming behavior
-- Clean separation between intermediate progress page and final shareable cart
+- Cleaner architecture with one less intermediate page
