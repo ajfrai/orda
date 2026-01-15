@@ -10,7 +10,7 @@ When wrapping up a session, update `PROGRESS.md` with:
 
 ## User Flow Documentation
 
-When proposing changes to any part of the core user flow, **always** provide detailed "before" and "after" flow descriptions.
+When proposing changes to **app user flows** (how users interact with the Orda UI), **always** provide detailed "before" and "after" flow descriptions.
 
 ### Flow Description Requirements
 
@@ -42,13 +42,13 @@ Each flow description must include:
 
 ### Verification Step
 
-After implementing the change:
-1. Test the actual flow end-to-end
-2. Write a concise summary of what was actually implemented
-3. Compare the implementation with the original "after" description
-4. Call out any discrepancies between intended and actual flow
+After implementing the app flow change:
+1. Test the actual user flow end-to-end in the app
+2. Write a concise summary of the implemented flow
+3. Compare the actual flow with the original "after" description
+4. Call out any discrepancies between intended and actual behavior
 
-This ensures the implemented behavior matches the design intent and prevents misalignment between vision and reality.
+This ensures the app behavior matches the design intent and prevents misalignment between vision and reality.
 
 ## Architecture
 
