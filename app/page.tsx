@@ -57,6 +57,19 @@ export default function Home() {
     }
 
     try {
+      setIsLoading(true);
+
+      // Create empty cart first
+      const cartResponse = await fetch('/api/cart/create', {
+        method: 'POST',
+      });
+
+      if (!cartResponse.ok) {
+        throw new Error('Failed to create cart');
+      }
+
+      const { cartId } = await cartResponse.json();
+
       // Store upload data in sessionStorage
       if (mode === 'url') {
         sessionStorage.setItem('menuUpload', JSON.stringify({ mode: 'url', url: menuUrl }));
@@ -71,19 +84,20 @@ export default function Home() {
             fileType: selectedFile.type,
             fileData: base64
           }));
-          // Redirect immediately to cart creating page
-          window.location.href = '/cart/creating';
+          // Redirect to cart page with streaming enabled
+          window.location.href = `/cart/${cartId}?streaming=true`;
         };
         reader.readAsDataURL(selectedFile);
         return;
       }
 
       // For URL mode, redirect immediately
-      window.location.href = '/cart/creating';
+      window.location.href = `/cart/${cartId}?streaming=true`;
     } catch (error) {
       console.error('[DEBUG] Error preparing upload:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       setErrorDetails(`Failed to prepare upload: ${errorMessage}`);
+      setIsLoading(false);
     }
   };
 
