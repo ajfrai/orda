@@ -45,156 +45,45 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setErrorDetails(null);
+
+    // Validate inputs
+    if (mode === 'url' && !menuUrl) {
+      setErrorDetails('Please enter a URL');
+      return;
+    }
+    if (mode === 'upload' && !selectedFile) {
+      setErrorDetails('Please select a file');
+      return;
+    }
 
     try {
-      let body: any;
-      let headers: HeadersInit = {
-        'Accept': 'text/event-stream', // Request streaming
-      };
-
+      // Store upload data in sessionStorage
       if (mode === 'url') {
-        // Send URL as JSON
-        headers['Content-Type'] = 'application/json';
-        body = JSON.stringify({ pdfUrl: menuUrl });
-      } else {
-        // Send file as FormData
-        if (!selectedFile) {
-          setErrorDetails('No file selected');
-          setIsLoading(false);
-          return;
-        }
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        body = formData;
-        // Don't set Content-Type header for FormData - browser will set it with boundary
-        delete headers['Content-Type'];
+        sessionStorage.setItem('menuUpload', JSON.stringify({ mode: 'url', url: menuUrl }));
+      } else if (selectedFile) {
+        // Convert file to base64 for sessionStorage
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result as string;
+          sessionStorage.setItem('menuUpload', JSON.stringify({
+            mode: 'upload',
+            fileName: selectedFile.name,
+            fileType: selectedFile.type,
+            fileData: base64
+          }));
+          // Redirect immediately to cart creating page
+          window.location.href = '/cart/creating';
+        };
+        reader.readAsDataURL(selectedFile);
+        return;
       }
 
-      console.log('[DEBUG] Sending streaming request to /api/parse-menu');
-      console.log('[DEBUG] Mode:', mode);
-
-      let response;
-      try {
-        response = await fetch('/api/parse-menu', {
-          method: 'POST',
-          headers,
-          body,
-        });
-      } catch (fetchError) {
-        // Network error - fetch itself failed
-        const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown fetch error';
-
-        // Provide more helpful error message for common cases
-        if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
-          throw new Error(
-            `Network request failed. This is usually temporary and could be:\n` +
-            `• Rate limiting by the server (too many requests)\n` +
-            `• Network connectivity issues\n` +
-            `• Server temporarily unavailable\n` +
-            `• Request timeout\n\n` +
-            `Try:\n` +
-            `• Wait a minute and try again\n` +
-            `• Upload the file directly instead\n` +
-            `• Check if the URL still works in your browser`
-          );
-        }
-
-        throw new Error(`Network request failed: ${errorMsg}`);
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-
-        // Try to parse error as JSON for better error messages
-        let errorMessage = `Server error: ${response.status}`;
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch {
-          // Not JSON, use raw text
-          if (errorText) {
-            errorMessage += ` - ${errorText}`;
-          }
-        }
-
-        throw new Error(errorMessage);
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error('No response body');
-      }
-
-      let buffer = '';
-      let hasReceivedData = false;
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          if (!hasReceivedData) {
-            throw new Error('Stream ended without receiving any data');
-          }
-          break;
-        }
-
-        // Decode chunk and add to buffer
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete SSE messages
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            const eventType = line.substring(7).trim();
-            continue;
-          }
-
-          if (line.startsWith('data: ')) {
-            hasReceivedData = true;
-            const data = JSON.parse(line.substring(6));
-
-            // Handle different event types
-            if (data.error) {
-              throw new Error(data.error);
-            }
-
-            // Redirect to cart page as soon as cart is created
-            if (data.cartId) {
-              console.log('[DEBUG] Cart created, redirecting to:', data.cartId);
-              window.location.href = `/cart/${data.cartId}?streaming=true`;
-              return;
-            }
-          }
-        }
-      }
+      // For URL mode, redirect immediately
+      window.location.href = '/cart/creating';
     } catch (error) {
-      console.error('[DEBUG] Error creating cart:', error);
-
+      console.error('[DEBUG] Error preparing upload:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? error.stack : '';
-
-      const debugInfo = `
-Caught Exception: ${errorMessage}
-
-Stack trace:
-${stack}
-
-Request details:
-- Mode: ${mode}
-- ${mode === 'upload' ? `File: ${selectedFile?.name} (${selectedFile?.type}, ${(selectedFile?.size || 0) / 1024} KB)` : `URL: ${menuUrl}`}
-      `.trim();
-
-      setErrorDetails(debugInfo);
-      setIsLoading(false);
+      setErrorDetails(`Failed to prepare upload: ${errorMessage}`);
     }
   };
 
