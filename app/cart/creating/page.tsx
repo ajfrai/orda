@@ -9,21 +9,6 @@ export default function CreatingCartPage() {
   const router = useRouter();
   const [progressStage, setProgressStage] = useState<ProgressStage>('downloading');
   const [error, setError] = useState<string | null>(null);
-  const [itemCount, setItemCount] = useState(0);
-  const [debugText, setDebugText] = useState<string>('');
-  const [isCopied, setIsCopied] = useState(false);
-  const [streamedItems, setStreamedItems] = useState<Array<{ item: any; category: string }>>([]);
-
-  const handleCopyDebug = async () => {
-    if (!debugText) return;
-    try {
-      await navigator.clipboard.writeText(debugText);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
 
   useEffect(() => {
     async function createCart() {
@@ -123,33 +108,15 @@ export default function CreatingCartPage() {
                 }
               }
 
-              // DEBUG: Show only item JSON (not progress/status messages)
-              if (data.item) {
-                setDebugText(JSON.stringify(data.item, null, 2));
-              }
-
-              // Handle cart creation and items
-              if (data.cartId) {
+              // Handle cart creation - redirect immediately when we get cart ID
+              if (data.cartId && !cartId) {
                 cartId = data.cartId;
-                if (data.item) {
-                  // Item received - add to streamed items and show card
-                  setStreamedItems(prev => [...prev, { item: data.item, category: data.category }]);
-                  setProgressStage('extracting');
-                  setItemCount(prev => prev + 1);
-                } else if (!data.item && !data.message) {
-                  // Complete event
-                  setProgressStage('complete');
-                  // Clean up sessionStorage
-                  sessionStorage.removeItem('menuUpload');
-                  // Redirect to actual cart page
-                  console.log('[DEBUG] Redirecting to cart:', cartId);
-                  window.location.href = `/cart/${cartId}`;
-                  return;
-                }
-              } else if (data.item && cartId) {
-                // Subsequent items
-                setStreamedItems(prev => [...prev, { item: data.item, category: data.category }]);
-                setItemCount(prev => prev + 1);
+                console.log('[DEBUG] Cart created, redirecting immediately to:', cartId);
+                // Clean up sessionStorage
+                sessionStorage.removeItem('menuUpload');
+                // Redirect to cart page where streaming will continue
+                window.location.href = `/cart/${cartId}?streaming=true`;
+                return;
               }
             }
           }
@@ -246,105 +213,20 @@ export default function CreatingCartPage() {
                   <span className="font-medium">Sending menu to Claude</span>
                 </div>
 
-                {/* Extracting menu items */}
+                {/* Creating cart */}
                 <div className={`flex items-center gap-2 transition-all ${
-                  progressStage === 'extracting'
+                  progressStage === 'parsing'
                     ? 'text-indigo-600 dark:text-indigo-400'
-                    : progressStage === 'complete'
-                    ? 'text-green-600 dark:text-green-400'
                     : 'text-gray-400 dark:text-gray-500'
                 }`}>
-                  {progressStage === 'extracting' ? (
-                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  ) : progressStage === 'complete' ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 animate-spin opacity-0" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                  )}
-                  <span className="font-medium">
-                    Extracting menu items
-                    {progressStage === 'extracting' && itemCount > 0 ? ` (${itemCount} found)` : ''}
-                  </span>
+                  <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span className="font-medium">Creating cart...</span>
                 </div>
-
-                {progressStage === 'complete' && (
-                  <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-600 dark:text-green-400 font-medium">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>Menu loaded successfully! Redirecting...</span>
-                  </div>
-                )}
               </div>
 
-              {/* Debug Output */}
-              {progressStage === 'extracting' && (
-                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      Debug: Current Item JSON
-                    </h3>
-                    <button
-                      onClick={handleCopyDebug}
-                      className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
-                    >
-                      {isCopied ? '✓ Copied!' : 'Copy'}
-                    </button>
-                  </div>
-                  <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-64 overflow-y-auto">
-                    {debugText || 'Waiting for next item...'}
-                  </pre>
-                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                    Shows the JSON for each item as it streams in. Container persists, text updates.
-                  </p>
-                </div>
-              )}
-
-              {/* Streamed Items */}
-              {streamedItems.length > 0 && (
-                <div className="mt-8 border-t border-gray-200 dark:border-gray-700 pt-8">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                    Menu Items ({streamedItems.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {streamedItems.map((itemData, idx) => (
-                      <div
-                        key={`${itemData.item.name}-${idx}`}
-                        className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 transition-all duration-300 ease-in"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                                {itemData.item.name}
-                              </h4>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {itemData.category}
-                              </span>
-                            </div>
-                            {itemData.item.description && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                {itemData.item.description}
-                              </p>
-                            )}
-                          </div>
-                          <span className="font-semibold text-gray-900 dark:text-gray-100 ml-3">
-                            ${itemData.item.price?.toFixed(2) || '0.00'}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
