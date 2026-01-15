@@ -11,6 +11,8 @@ interface CartResponse {
   cartItems: CartItem[];
 }
 
+type ProgressStage = 'downloading' | 'parsing' | 'extracting' | 'complete';
+
 export default function CartPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -23,9 +25,10 @@ export default function CartPage() {
   const [streamingComplete, setStreamingComplete] = useState(false);
   const previousItemCount = useRef(0);
   const noChangeCount = useRef(0);
-  const [progressStage, setProgressStage] = useState<'extracting' | 'complete'>('extracting');
+  const [progressStage, setProgressStage] = useState<ProgressStage>('downloading');
   const [debugText, setDebugText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
+  const parseMenuStarted = useRef(false);
 
   const handleCopyDebug = async () => {
     if (!debugText) return;
@@ -38,11 +41,156 @@ export default function CartPage() {
     }
   };
 
+  // Start parse-menu streaming when streaming=true
+  useEffect(() => {
+    async function startParsing() {
+      if (!isStreaming || parseMenuStarted.current || !cartId) return;
+
+      // Get upload data from sessionStorage
+      const uploadDataStr = sessionStorage.getItem('menuUpload');
+      if (!uploadDataStr) {
+        setError('No upload data found. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      parseMenuStarted.current = true;
+
+      try {
+        const uploadData = JSON.parse(uploadDataStr);
+        let body: any;
+        let headers: HeadersInit = {
+          'Accept': 'text/event-stream',
+        };
+
+        if (uploadData.mode === 'url') {
+          headers['Content-Type'] = 'application/json';
+          body = JSON.stringify({ pdfUrl: uploadData.url, cartId });
+        } else if (uploadData.mode === 'upload') {
+          // Convert base64 back to blob
+          const response = await fetch(uploadData.fileData);
+          const blob = await response.blob();
+          const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
+
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('cartId', cartId);
+          body = formData;
+        }
+
+        console.log('[DEBUG] Starting parse-menu streaming:', uploadData.mode);
+        setProgressStage('downloading');
+
+        const response = await fetch('/api/parse-menu', {
+          method: 'POST',
+          headers,
+          body,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = `Server error: ${response.status}`;
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch {
+            if (errorText) {
+              errorMessage += ` - ${errorText}`;
+            }
+          }
+          throw new Error(errorMessage);
+        }
+
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) {
+          throw new Error('No response body');
+        }
+
+        let buffer = '';
+        let hasReceivedData = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            if (!hasReceivedData) {
+              throw new Error('Stream ended without receiving any data');
+            }
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              hasReceivedData = true;
+              const data = JSON.parse(line.substring(6));
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+
+              // Update progress based on messages
+              if (data.message) {
+                const msg = data.message.toLowerCase();
+                if (msg.includes('analyzing') || msg.includes('sending to claude')) {
+                  setProgressStage('parsing');
+                }
+              }
+
+              // Update progress stage when first item arrives
+              if (data.item && progressStage !== 'extracting') {
+                setProgressStage('extracting');
+              }
+
+              // Update debug text with item JSON
+              if (data.item) {
+                setDebugText(JSON.stringify(data.item, null, 2));
+              }
+
+              // When complete, mark as done
+              if (data.complete) {
+                console.log('[DEBUG] Streaming complete');
+                setStreamingComplete(true);
+                setProgressStage('complete');
+                sessionStorage.removeItem('menuUpload');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[DEBUG] Error parsing menu:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+      }
+    }
+
+    startParsing();
+  }, [cartId, isStreaming, progressStage]);
+
+  // Fetch cart data initially
   useEffect(() => {
     async function fetchCart() {
       try {
         const response = await fetch(`/api/cart/${cartId}`);
         if (!response.ok) {
+          // If cart doesn't have menu yet (during streaming), that's okay
+          if (isStreaming) {
+            setData({
+              cart: { id: cartId, menu_id: null, tip_percentage: 18 },
+              menu: { id: '', restaurant_name: '', items: [], location: { city: '', state: '' }, tax_rate: 0, pdf_url: null },
+              cartItems: [],
+            });
+            setLoading(false);
+            return;
+          }
           const errorData = await response.json();
           throw new Error(errorData.error || 'Failed to fetch cart');
         }
@@ -159,11 +307,13 @@ export default function CartPage() {
               {/* Header */}
               <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  {data.menu.restaurant_name}
+                  {data.menu.restaurant_name || 'Your Cart'}
                 </h1>
-                <p className="text-gray-600 dark:text-gray-300 text-sm">
-                  {data.menu.location.city}, {data.menu.location.state} • Tax Rate: {(data.menu.tax_rate * 100).toFixed(2)}%
-                </p>
+                {data.menu.restaurant_name && (
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">
+                    {data.menu.location.city}, {data.menu.location.state} • Tax Rate: {(data.menu.tax_rate * 100).toFixed(2)}%
+                  </p>
+                )}
                 {data.menu.pdf_url && (
                   <a
                     href={data.menu.pdf_url}
@@ -176,6 +326,53 @@ export default function CartPage() {
                 )}
                 {isStreaming && (
                   <div className="mt-4 space-y-2 text-sm">
+                    {/* Downloading menu */}
+                    <div className={`flex items-center gap-2 transition-all ${
+                      progressStage === 'downloading'
+                        ? 'text-indigo-600 dark:text-indigo-400'
+                        : progressStage === 'parsing' || progressStage === 'extracting' || progressStage === 'complete'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-400 dark:text-gray-500'
+                    }`}>
+                      {progressStage === 'downloading' ? (
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      <span>Downloading menu</span>
+                    </div>
+
+                    {/* Sending to Claude */}
+                    <div className={`flex items-center gap-2 transition-all ${
+                      progressStage === 'parsing'
+                        ? 'text-indigo-600 dark:text-indigo-400'
+                        : progressStage === 'extracting' || progressStage === 'complete'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-400 dark:text-gray-500'
+                    }`}>
+                      {progressStage === 'parsing' ? (
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : progressStage === 'extracting' || progressStage === 'complete' ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 animate-spin opacity-0" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      )}
+                      <span>Sending menu to Claude</span>
+                    </div>
+
                     {/* Extracting menu items */}
                     <div className={`flex items-center gap-2 transition-all ${
                       progressStage === 'extracting'

@@ -232,6 +232,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
       try {
         let fileData: FileData;
         let sourceUrl: string | null = null;
+        let existingCartId: string | null = null;
 
         // Helper to send SSE message
         const sendEvent = (event: string, data: any) => {
@@ -244,6 +245,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           // Handle file upload
           const formData = await request.formData();
           const file = formData.get('file') as File;
+          existingCartId = formData.get('cartId') as string | null;
 
           if (!file) {
             sendEvent('error', { error: 'No file provided' });
@@ -276,8 +278,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           };
         } else {
           // Handle URL
-          const body: ParseMenuRequest = await request.json();
-          const { pdfUrl } = body;
+          const body: ParseMenuRequest & { cartId?: string } = await request.json();
+          const { pdfUrl, cartId } = body;
+          existingCartId = cartId || null;
 
           // Validate URL
           const validation = validatePdfUrl(pdfUrl);
@@ -419,7 +422,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
             // Create menu and cart on first item (if we have metadata)
             if (!cartId && metadata && receivedItems.length === 1) {
               try {
-                sendEvent('status', { message: 'Creating cart...' });
+                sendEvent('status', { message: 'Creating menu...' });
 
                 // Get tax rate
                 const taxRate = getTaxRate(metadata.location?.state);
@@ -446,33 +449,50 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
 
                 menuId = menu.id;
 
-                // Create cart
-                const { data: cart, error: cartError } = await supabase
-                  .from('carts')
-                  .insert({
-                    menu_id: menu.id,
-                    tip_percentage: 18,
-                  })
-                  .select()
-                  .single();
+                // Use existing cart or create new one
+                if (existingCartId) {
+                  // Update existing cart with menu_id
+                  const { error: updateError } = await supabase
+                    .from('carts')
+                    .update({ menu_id: menu.id })
+                    .eq('id', existingCartId);
 
-                if (cartError) {
-                  console.error('Error creating cart:', cartError);
-                  sendEvent('error', { error: 'Failed to create cart' });
-                  return;
+                  if (updateError) {
+                    console.error('Error updating cart:', updateError);
+                    sendEvent('error', { error: 'Failed to update cart' });
+                    return;
+                  }
+
+                  cartId = existingCartId;
+                } else {
+                  // Create new cart
+                  const { data: cart, error: cartError } = await supabase
+                    .from('carts')
+                    .insert({
+                      menu_id: menu.id,
+                      tip_percentage: 18,
+                    })
+                    .select()
+                    .single();
+
+                  if (cartError) {
+                    console.error('Error creating cart:', cartError);
+                    sendEvent('error', { error: 'Failed to create cart' });
+                    return;
+                  }
+
+                  cartId = cart.id;
+
+                  // Send firstItem event to trigger navigation (only for new carts)
+                  sendEvent('firstItem', {
+                    cartId: cart.id,
+                    restaurantName: metadata.restaurantName,
+                    item: event.item,
+                  });
                 }
-
-                cartId = cart.id;
-
-                // Send firstItem event to trigger navigation
-                sendEvent('firstItem', {
-                  cartId: cart.id,
-                  restaurantName: metadata.restaurantName,
-                  item: event.item,
-                });
               } catch (err) {
                 console.error('Error in first item processing:', err);
-                sendEvent('error', { error: 'Failed to create cart' });
+                sendEvent('error', { error: 'Failed to create menu' });
                 return;
               }
             } else if (cartId && menuId) {
