@@ -4,6 +4,9 @@
 
 echo "🔧 Setting up environment variables..."
 
+# Determine project directory
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+
 # Check if we're in a web session (has CLAUDE_ENV_FILE)
 if [ -n "$CLAUDE_ENV_FILE" ]; then
   echo "📱 Detected web/mobile session - configuring environment"
@@ -23,16 +26,18 @@ export GITHUB_TOKEN=${GITHUB_TOKEN:-""}
 ENV_VARS
 
   echo "✅ Environment configured for web session"
+  echo "💡 To use GitHub CLI, set GITHUB_TOKEN in Claude environment settings"
 
 else
   echo "💻 Detected desktop session"
 
   # For desktop sessions, check if .env.local exists
-  if [ -f "$CLAUDE_PROJECT_DIR/.env.local" ]; then
-    echo "✅ Found .env.local - variables will be loaded when you run 'source ./load-env.sh'"
+  if [ -f "$PROJECT_DIR/.env.local" ]; then
+    echo "✅ Found .env.local - run 'source ./load-env.sh' to load variables"
   else
-    echo "⚠️  No .env.local found - create one to persist environment variables"
-    echo "   Template available in .env.example"
+    echo "⚠️  No .env.local found"
+    echo "   Run: cp .env.example .env.local"
+    echo "   Then edit .env.local with your values"
   fi
 
 fi
