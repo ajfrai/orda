@@ -170,8 +170,8 @@ export default function CartPage() {
           // If cart doesn't have menu yet (during streaming), that's okay
           if (isStreaming) {
             setData({
-              cart: { id: cartId, menu_id: null, tip_percentage: 18 },
-              menu: { id: '', restaurant_name: '', items: [], location: { city: '', state: '' }, tax_rate: 0, pdf_url: null },
+              cart: { id: cartId, menu_id: null, tip_percentage: 18, created_at: new Date().toISOString() },
+              menu: { id: '', restaurant_name: '', items: [], location: { city: '', state: '' }, tax_rate: 0, pdf_url: null, created_at: new Date().toISOString() },
               cartItems: [],
             });
             setLoading(false);
