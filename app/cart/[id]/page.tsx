@@ -113,7 +113,14 @@ export default function CartPage() {
           {loading && (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-              <p className="mt-4 text-gray-600 dark:text-gray-300">Loading cart...</p>
+              <p className="mt-4 text-gray-600 dark:text-gray-300">
+                {isStreaming ? 'Setting up your cart...' : 'Loading cart...'}
+              </p>
+              {isStreaming && (
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                  Menu items will appear as they're parsed by AI
+                </p>
+              )}
             </div>
           )}
 
@@ -145,9 +152,17 @@ export default function CartPage() {
                   </a>
                 )}
                 {isStreaming && !streamingComplete && (
-                  <div className="mt-3 flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg text-sm text-indigo-600 dark:text-indigo-400">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
-                    <span>Loading menu items...</span>
+                    <span>Parsing menu with AI... ({data?.menu.items.length || 0} items found)</span>
+                  </div>
+                )}
+                {isStreaming && streamingComplete && (
+                  <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-600 dark:text-green-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Menu loaded successfully</span>
                   </div>
                 )}
               </div>
