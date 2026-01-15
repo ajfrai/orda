@@ -1,0 +1,9 @@
+# Files to include in new worktrees even if they're gitignored
+# This ensures environment files persist across desktop sessions
+
+.env.local
+.env
+.env.*
+
+# Claude local settings
+**/.claude/settings.local.json
