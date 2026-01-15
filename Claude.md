@@ -76,6 +76,48 @@ When the user says "wrap up this session" or similar, follow these steps:
 3. **Test incrementally**: Build after significant changes
 4. **Document decisions**: Update PROGRESS.md with rationale for technical choices
 
+## User Flow Documentation
+
+When proposing changes to any part of the core user flow, **always** provide detailed "before" and "after" flow descriptions.
+
+### Flow Description Requirements
+
+Each flow description must include:
+
+1. **Initial State**: What the user sees when they begin
+2. **User Actions**: How they interact (clicks, inputs, gestures)
+3. **State Transitions**: What views/screens they see next
+4. **Intermediate States**: Any loading, validation, or feedback states
+5. **Terminal State**: The final state where the flow completes
+
+### Format
+
+```
+#### Before Flow:
+1. User sees [initial view/screen]
+2. User [performs action]
+3. System [shows/responds with]
+4. User sees [next view]
+5. ... continue until terminal state
+
+#### After Flow:
+1. User sees [initial view/screen]
+2. User [performs action]
+3. System [shows/responds with]
+4. User sees [next view]
+5. ... continue until terminal state
+```
+
+### Verification Step
+
+After implementing the change:
+1. Test the actual flow end-to-end
+2. Write a concise summary of what was actually implemented
+3. Compare the implementation with the original "after" description
+4. Call out any discrepancies between intended and actual flow
+
+This ensures the implemented behavior matches the design intent and prevents misalignment between vision and reality.
+
 ## Project-Specific Guidelines
 
 ### Orda App Architecture
