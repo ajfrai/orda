@@ -6,6 +6,37 @@ Track work through:
 - **GitHub Issues**: Current tasks, bugs, and features
 - **PLAN.md**: Architecture and implementation roadmap
 
+## Acceptance Criteria Standards
+
+Every GitHub issue must have clear, verifiable acceptance criteria:
+
+- **Objective and Testable**: Criteria should be unambiguous and verifiable
+- **Specific Outcomes**: Define what success looks like with concrete details
+- **Avoid Subjective Terms**: No "works well", "looks nice", "is good"
+
+**Examples:**
+- ✅ Good: "API returns 404 when cart ID doesn't exist"
+- ✅ Good: "Landing page includes URL input field and Create Cart button"
+- ✅ Good: "getTaxRate('CA') returns 0.0725"
+- ❌ Bad: "API works well"
+- ❌ Bad: "UI looks nice"
+- ❌ Bad: "Component is functional"
+
+**When writing issues:**
+- If acceptance criteria are missing: Discuss with user to define them
+- If acceptance criteria are unclear: Ask questions to clarify what "done" means
+- Review criteria before starting work
+
+## Project Wrap-Up
+
+During project wrap-up, review PLAN.md and GitHub issues:
+
+1. **Verify Acceptance Criteria**: Check each issue has clear, verifiable criteria (see standards above)
+2. **Close Completed Issues**: Match implementation against acceptance criteria
+   - If all criteria are met: Close the issue
+   - If partially complete: Document what's done and what remains
+   - If blocked: Note blockers and dependencies
+
 ## User Flow Documentation
 
 When proposing changes to **app user flows** (how users interact with the Orda UI), **always** provide detailed "before" and "after" flow descriptions.
