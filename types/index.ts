@@ -37,8 +37,7 @@ export interface Cart {
 export interface CartItem {
   id: string;
   cart_id: string;
-  user_id: string;
-  user_name: string; // Display name from profiles table
+  user_name: string;
   item_name: string;
   item_price: number;
   is_price_estimate: boolean;
