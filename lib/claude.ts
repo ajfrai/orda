@@ -29,11 +29,7 @@ export interface MenuItem {
   description?: string;
   price?: number;
   isEstimate: boolean;
-  isSpicy?: boolean;
-  isVegetarian?: boolean;
-  isVegan?: boolean;
-  isGlutenFree?: boolean;
-  isKosher?: boolean;
+  chips?: string[];
 }
 
 interface FileData {
@@ -158,20 +154,25 @@ If it IS a restaurant menu, respond with a STREAM of individual JSON objects, on
 First, output the metadata:
 {"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
 
-Then, output each menu item as a separate JSON object:
-{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "isSpicy": true, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
-{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
-{"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags:
+{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "chips": ["Spicy"]}
+{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "chips": ["Vegetarian"]}
+{"type": "item", "category": "Entrees", "name": "Salad", "description": "Fresh garden salad", "price": 8.99, "isEstimate": false, "chips": ["Vegan", "Gluten Free"]}
 
 Finally, output a completion marker when all menu items are extracted:
 {"status": "complete", "type": "menu_extraction_end"}
 
-DIETARY INDICATORS:
-- Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
-- Set isVegetarian: true for items with no meat/fish (but may include dairy/eggs)
-- Set isVegan: true for items with no animal products (stricter than vegetarian)
-- Set isGlutenFree: true for items marked as gluten-free or naturally gluten-free
-- Set isKosher: true for items marked with kosher symbols (K, OU, etc.)
+CHIPS (include all that apply as strings in the chips array):
+- "Spicy" - for items marked with chili peppers or described as spicy/hot
+- "Vegetarian" - for items with no meat/fish (but may include dairy/eggs)
+- "Vegan" - for items with no animal products
+- "Gluten Free" - for items marked as gluten-free or naturally gluten-free
+- "Kosher" - for items marked with kosher symbols (K, OU, etc.)
+- "Dairy Free" - for items without dairy products
+- "Nut Free" - for items without nuts
+- Any other relevant dietary tags you find on the menu
+
+If an item has no special dietary attributes, use an empty array: "chips": []
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
@@ -228,11 +229,7 @@ CRITICAL:
           description: obj.description,
           price: obj.price,
           isEstimate: obj.isEstimate,
-          isSpicy: obj.isSpicy,
-          isVegetarian: obj.isVegetarian,
-          isVegan: obj.isVegan,
-          isGlutenFree: obj.isGlutenFree,
-          isKosher: obj.isKosher,
+          chips: obj.chips || [],
         });
       } else if (obj.type === 'error') {
         return { isMenu: false, error: obj.message };
@@ -411,20 +408,25 @@ If it IS a restaurant menu, respond with a STREAM of individual JSON objects, on
 First, output the metadata:
 {"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
 
-Then, output each menu item as a separate JSON object:
-{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "isSpicy": true, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
-{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
-{"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
+Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags:
+{"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "chips": ["Spicy"]}
+{"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "chips": ["Vegetarian"]}
+{"type": "item", "category": "Entrees", "name": "Salad", "description": "Fresh garden salad", "price": 8.99, "isEstimate": false, "chips": ["Vegan", "Gluten Free"]}
 
 Finally, output a completion marker when all menu items are extracted:
 {"status": "complete", "type": "menu_extraction_end"}
 
-DIETARY INDICATORS:
-- Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
-- Set isVegetarian: true for items with no meat/fish (but may include dairy/eggs)
-- Set isVegan: true for items with no animal products (stricter than vegetarian)
-- Set isGlutenFree: true for items marked as gluten-free or naturally gluten-free
-- Set isKosher: true for items marked with kosher symbols (K, OU, etc.)
+CHIPS (include all that apply as strings in the chips array):
+- "Spicy" - for items marked with chili peppers or described as spicy/hot
+- "Vegetarian" - for items with no meat/fish (but may include dairy/eggs)
+- "Vegan" - for items with no animal products
+- "Gluten Free" - for items marked as gluten-free or naturally gluten-free
+- "Kosher" - for items marked with kosher symbols (K, OU, etc.)
+- "Dairy Free" - for items without dairy products
+- "Nut Free" - for items without nuts
+- Any other relevant dietary tags you find on the menu
+
+If an item has no special dietary attributes, use an empty array: "chips": []
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
@@ -499,11 +501,7 @@ CRITICAL:
                 description: obj.description,
                 price: obj.price,
                 isEstimate: obj.isEstimate,
-                isSpicy: obj.isSpicy,
-                isVegetarian: obj.isVegetarian,
-                isVegan: obj.isVegan,
-                isGlutenFree: obj.isGlutenFree,
-                isKosher: obj.isKosher,
+                chips: obj.chips || [],
               };
 
               // Console log each streamed menu item
@@ -512,11 +510,7 @@ CRITICAL:
                 category: obj.category,
                 price: menuItem.price,
                 isEstimate: menuItem.isEstimate,
-                isSpicy: menuItem.isSpicy,
-                isVegetarian: menuItem.isVegetarian,
-                isVegan: menuItem.isVegan,
-                isGlutenFree: menuItem.isGlutenFree,
-                isKosher: menuItem.isKosher,
+                chips: menuItem.chips,
               });
 
               onProgress({
@@ -548,11 +542,7 @@ CRITICAL:
               description: obj.description,
               price: obj.price,
               isEstimate: obj.isEstimate,
-              isSpicy: obj.isSpicy,
-              isVegetarian: obj.isVegetarian,
-              isVegan: obj.isVegan,
-              isGlutenFree: obj.isGlutenFree,
-              isKosher: obj.isKosher,
+              chips: obj.chips || [],
             },
             category: obj.category,
           });
@@ -586,11 +576,7 @@ CRITICAL:
           description: obj.description,
           price: obj.price,
           isEstimate: obj.isEstimate,
-          isSpicy: obj.isSpicy,
-          isVegetarian: obj.isVegetarian,
-          isVegan: obj.isVegan,
-          isGlutenFree: obj.isGlutenFree,
-          isKosher: obj.isKosher,
+          chips: obj.chips || [],
         });
       } else if (obj.type === 'error') {
         throw new Error(obj.message);

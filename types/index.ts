@@ -6,12 +6,8 @@ export interface MenuItem {
   description?: string;
   price: number;
   is_estimate: boolean;
-  // Dietary indicators
-  is_spicy?: boolean;
-  is_vegetarian?: boolean;
-  is_vegan?: boolean;
-  is_gluten_free?: boolean;
-  is_kosher?: boolean;
+  // Flexible dietary/attribute tags as chips
+  chips?: string[];
 }
 
 export interface Menu {

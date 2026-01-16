@@ -117,11 +117,7 @@ export async function POST(request: NextRequest) {
         description: item.description || null,
         price: item.price || 0,
         is_estimate: item.isEstimate,
-        is_spicy: item.isSpicy || false,
-        is_vegetarian: item.isVegetarian || false,
-        is_vegan: item.isVegan || false,
-        is_gluten_free: item.isGlutenFree || false,
-        is_kosher: item.isKosher || false,
+        chips: item.chips || [],
       }))
     );
 
@@ -414,11 +410,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
               description: event.item.description || null,
               price: event.item.price || 0,
               is_estimate: event.item.isEstimate,
-              is_spicy: event.item.isSpicy || false,
-              is_vegetarian: event.item.isVegetarian || false,
-              is_vegan: event.item.isVegan || false,
-              is_gluten_free: event.item.isGlutenFree || false,
-              is_kosher: event.item.isKosher || false,
+              chips: event.item.chips || [],
             };
             receivedItems.push(menuItem);
 
@@ -549,11 +541,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
               description: item.description || null,
               price: item.price || 0,
               is_estimate: item.isEstimate,
-              is_spicy: item.isSpicy || false,
-              is_vegetarian: item.isVegetarian || false,
-              is_vegan: item.isVegan || false,
-              is_gluten_free: item.isGlutenFree || false,
-              is_kosher: item.isKosher || false,
+              chips: item.chips || [],
             }))
           );
 
@@ -579,11 +567,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
               description: item.description || null,
               price: item.price || 0,
               is_estimate: item.isEstimate,
-              is_spicy: item.isSpicy || false,
-              is_vegetarian: item.isVegetarian || false,
-              is_vegan: item.isVegan || false,
-              is_gluten_free: item.isGlutenFree || false,
-              is_kosher: item.isKosher || false,
+              chips: item.chips || [],
             }))
           );
 

@@ -13,7 +13,7 @@ interface CartResponse {
   cartItems: CartItem[];
 }
 
-type ProgressStage = 'extracting' | 'complete';
+type ProgressStage = 'setup' | 'parsing' | 'complete';
 
 export default function CartPage() {
   const params = useParams();
@@ -27,7 +27,7 @@ export default function CartPage() {
   const [streamingComplete, setStreamingComplete] = useState(false);
   const previousItemCount = useRef(0);
   const noChangeCount = useRef(0);
-  const [progressStage, setProgressStage] = useState<ProgressStage>('extracting');
+  const [progressStage, setProgressStage] = useState<ProgressStage>('setup');
   const [streamText, setStreamText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
   const parseMenuStarted = useRef(false);
@@ -163,6 +163,9 @@ export default function CartPage() {
         }
 
         console.log('[DEBUG] Starting parse-menu streaming:', uploadData.mode);
+
+        // Transition from setup to parsing phase
+        setProgressStage('parsing');
 
         const response = await fetch('/api/parse-menu', {
           method: 'POST',
@@ -448,17 +451,36 @@ export default function CartPage() {
                     View original menu
                   </a>
                 )}
-                {isStreaming && (
+                {isStreaming && !streamingComplete && (
                   <div className="mt-4 space-y-2 text-sm">
-                    {/* Extracting menu items */}
+                    {/* Setup phase */}
                     <div className={`flex items-center gap-2 transition-all ${
-                      progressStage === 'extracting'
+                      progressStage === 'setup'
                         ? 'text-indigo-600 dark:text-indigo-400'
-                        : progressStage === 'complete'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-gray-400 dark:text-gray-500'
+                        : 'text-green-600 dark:text-green-400'
                     }`}>
-                      {progressStage === 'extracting' ? (
+                      {progressStage === 'setup' ? (
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      <span>Setting up...</span>
+                    </div>
+
+                    {/* Parsing phase */}
+                    <div className={`flex items-center gap-2 transition-all ${
+                      progressStage === 'parsing'
+                        ? 'text-indigo-600 dark:text-indigo-400'
+                        : progressStage === 'setup'
+                        ? 'text-gray-400 dark:text-gray-500'
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
+                      {progressStage === 'parsing' ? (
                         <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -468,30 +490,18 @@ export default function CartPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       ) : (
-                        <svg className="w-4 h-4 animate-spin opacity-0" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
+                        <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600" />
                       )}
                       <span>
-                        Extracting menu items
-                        {progressStage === 'extracting' && data?.menu.items.length ? ` (${data.menu.items.length} found)` : ''}
+                        Parsing menu items
+                        {progressStage === 'parsing' && data?.menu.items.length ? ` (${data.menu.items.length} found)` : ''}
                       </span>
                     </div>
-
-                    {streamingComplete && (
-                      <div className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm text-green-600 dark:text-green-400 font-medium">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Menu loaded successfully</span>
-                      </div>
-                    )}
                   </div>
                 )}
 
                 {/* Live Parsing View */}
-                {isStreaming && progressStage === 'extracting' && (
+                {isStreaming && progressStage === 'parsing' && (
                   <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
