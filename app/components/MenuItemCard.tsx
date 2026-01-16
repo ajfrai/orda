@@ -27,41 +27,24 @@ export default function MenuItemCard({ item, index, onAddToCart }: MenuItemCardP
         onClick={handleClick}
       >
         <div className="flex-1">
-          {/* Item Name with Dietary Indicators */}
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
-              {item.name}
-            </h3>
-            {(item.is_spicy || item.is_vegetarian || item.is_vegan || item.is_gluten_free || item.is_kosher) && (
-              <div className="flex gap-1 text-sm">
-                {item.is_spicy && (
-                  <span title="Spicy" className="hover:scale-125 transition-transform">
-                    🌶️
-                  </span>
-                )}
-                {item.is_vegetarian && (
-                  <span title="Vegetarian" className="hover:scale-125 transition-transform">
-                    🥬
-                  </span>
-                )}
-                {item.is_vegan && (
-                  <span title="Vegan" className="hover:scale-125 transition-transform">
-                    🌱
-                  </span>
-                )}
-                {item.is_gluten_free && (
-                  <span title="Gluten Free" className="hover:scale-125 transition-transform">
-                    🌾
-                  </span>
-                )}
-                {item.is_kosher && (
-                  <span title="Kosher" className="hover:scale-125 transition-transform">
-                    ✡️
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Item Name */}
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-lg mb-1">
+            {item.name}
+          </h3>
+
+          {/* Dietary/Attribute Chips */}
+          {item.chips && item.chips.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {item.chips.map((chip, chipIndex) => (
+                <span
+                  key={chipIndex}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Description */}
           {item.description && (
