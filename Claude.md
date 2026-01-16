@@ -1,12 +1,10 @@
 # Claude Code Assistant Guidelines
 
-## Session Wrap-Up
+## Project Status
 
-When wrapping up a session, update `PROGRESS.md` with:
-- Session entry with today's date
-- Completed tasks with technical details
-- Files created/modified and key decisions
-- "Key Accomplishments" summary
+Track work through:
+- **GitHub Issues**: Current tasks, bugs, and features
+- **PLAN.md**: Architecture and implementation roadmap
 
 ## User Flow Documentation
 
@@ -108,8 +106,7 @@ export async function GET(
 
 ## Reference Files
 
-- `PLAN.md` - Overall architecture
-- `PROGRESS.md` - Development history and status
-- `TESTING.md` - Testing procedures and examples
+- `PLAN.md` - Overall architecture and implementation roadmap
 - `supabase/schema.sql` - Database schema
 - `types/index.ts` - TypeScript interfaces
+- **GitHub Issues** - Task tracking and feature development
