@@ -5,6 +5,9 @@ import { useEffect, useState, useRef } from 'react';
 import type { Menu, MenuItem, Cart, CartItem } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
 import AddItemModal from '@/app/components/add-item-modal';
+import AuthModal from '@/app/components/AuthModal';
+import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
 
 interface CartResponse {
   cart: Cart;
@@ -19,6 +22,7 @@ export default function CartPage() {
   const searchParams = useSearchParams();
   const cartId = params?.id as string;
   const isStreaming = searchParams?.get('streaming') === 'true';
+  const { user, loading: authLoading, signOut } = useAuth();
 
   const [data, setData] = useState<CartResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +38,7 @@ export default function CartPage() {
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleCopyStreamData = async () => {
     if (!streamText) return;
@@ -48,6 +53,10 @@ export default function CartPage() {
 
   // Modal handlers
   const handleItemClick = (item: MenuItem) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     setSelectedItem(item);
     setIsModalOpen(true);
   };
@@ -58,17 +67,27 @@ export default function CartPage() {
   };
 
   const handleAddToCart = async (item: MenuItem, quantity: number, notes: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
     try {
-      // Get user name from localStorage, or use 'Guest' as fallback
-      const userName = localStorage.getItem('orda_user_name') || 'Guest';
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token;
+
+      if (!token) {
+        setShowAuthModal(true);
+        return;
+      }
 
       const response = await fetch(`/api/cart/${cartId}/items`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          user_name: userName,
           item_name: item.name,
           item_price: item.price,
           is_price_estimate: item.is_estimate,
@@ -318,6 +337,8 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-6">
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+
       <div className="max-w-6xl mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 border border-gray-100 dark:border-gray-700">
           {loading && (
@@ -345,9 +366,39 @@ export default function CartPage() {
             <>
               {/* Header */}
               <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  {data.menu.restaurant_name || 'Your Cart'}
-                </h1>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                      {data.menu.restaurant_name || 'Your Cart'}
+                    </h1>
+                  </div>
+
+                  {/* User Menu */}
+                  <div className="flex items-center gap-3">
+                    {authLoading ? (
+                      <div className="text-sm text-gray-500">Loading...</div>
+                    ) : user ? (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">
+                          {user.user_metadata?.display_name || user.email}
+                        </span>
+                        <button
+                          onClick={() => signOut()}
+                          className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowAuthModal(true)}
+                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 transition"
+                      >
+                        Sign In
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {data.menu.restaurant_name && (
                   <p className="text-gray-600 dark:text-gray-300 text-sm">
                     {data.menu.location.city}, {data.menu.location.state} • Tax Rate: {(data.menu.tax_rate * 100).toFixed(2)}%
