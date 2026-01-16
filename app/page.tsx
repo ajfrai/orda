@@ -112,7 +112,7 @@ export default function Home() {
                 Order together, split the bill effortlessly
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Share a menu, build a cart with friends, and split costs automatically
+                Share a menu, build an order with friends, and split costs automatically
               </p>
             </div>
 
@@ -270,7 +270,7 @@ export default function Home() {
                   Processing...
                 </span>
               ) : (
-                'Create Cart'
+                'Generate Menu'
               )}
             </button>
           </form>
@@ -286,7 +286,7 @@ export default function Home() {
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">2.</span>
-                <span>Get a shareable cart link for your group</span>
+                <span>Get a shareable order link for your group</span>
               </li>
               <li className="flex gap-2">
                 <span className="font-semibold text-indigo-600 dark:text-indigo-400">3.</span>
