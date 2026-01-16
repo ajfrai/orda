@@ -38,11 +38,14 @@ export default function CartPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
-  // Load user name from localStorage on mount
+  // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
     const savedName = localStorage.getItem('orda_user_name');
     if (savedName) {
       setUserName(savedName);
+    } else {
+      // Automatically show name prompt if no name is set
+      setShowAuthModal(true);
     }
   }, []);
 
