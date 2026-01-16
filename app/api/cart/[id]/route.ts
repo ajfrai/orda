@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceRoleClient } from '@/lib/supabase';
+import type { UpdateTipRequest } from '@/types';
 
 export async function GET(
   request: NextRequest,
@@ -72,6 +73,48 @@ export async function GET(
     });
   } catch (error) {
     console.error('[ERROR] Failed to fetch cart:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: cartId } = await params;
+    const body: UpdateTipRequest = await request.json();
+    const supabase = getServiceRoleClient();
+
+    // Validate tip_percentage
+    if (typeof body.tip_percentage !== 'number' || body.tip_percentage < 0 || body.tip_percentage > 100) {
+      return NextResponse.json(
+        { error: 'Invalid tip percentage. Must be between 0 and 100.' },
+        { status: 400 }
+      );
+    }
+
+    // Update cart
+    const { data: cart, error: updateError } = await supabase
+      .from('carts')
+      .update({ tip_percentage: body.tip_percentage })
+      .eq('id', cartId)
+      .select()
+      .single();
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: 'Failed to update cart', details: updateError },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(cart);
+  } catch (error) {
+    console.error('[ERROR] Failed to update cart:', error);
     return NextResponse.json(
       { error: 'Internal server error', details: error },
       { status: 500 }
