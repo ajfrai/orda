@@ -83,7 +83,7 @@ export default function AddItemModal({ item, isOpen, onClose, onAdd }: AddItemMo
             id="modal-title"
             className="text-xl font-bold text-white"
           >
-            Add to Cart
+            Add to Order
           </h2>
         </div>
 
@@ -198,7 +198,7 @@ export default function AddItemModal({ item, isOpen, onClose, onAdd }: AddItemMo
             onClick={handleAddToCart}
             className="flex-1 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold hover:from-indigo-600 hover:to-purple-600 transition-all shadow-lg hover:shadow-xl"
           >
-            Add to Cart
+            Add to Order
           </button>
         </div>
       </div>

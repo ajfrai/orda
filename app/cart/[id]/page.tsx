@@ -408,7 +408,7 @@ export default function CartPage() {
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                      {data.menu.restaurant_name || 'Your Cart'}
+                      {data.menu.restaurant_name || 'Your Order'}
                     </h1>
                   </div>
 
