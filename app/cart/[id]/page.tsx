@@ -26,14 +26,14 @@ export default function CartPage() {
   const previousItemCount = useRef(0);
   const noChangeCount = useRef(0);
   const [progressStage, setProgressStage] = useState<ProgressStage>('extracting');
-  const [debugText, setDebugText] = useState<string>('');
+  const [streamText, setStreamText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
   const parseMenuStarted = useRef(false);
 
-  const handleCopyDebug = async () => {
-    if (!debugText) return;
+  const handleCopyStreamData = async () => {
+    if (!streamText) return;
     try {
-      await navigator.clipboard.writeText(debugText);
+      await navigator.clipboard.writeText(streamText);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -138,7 +138,7 @@ export default function CartPage() {
 
               // Update debug text with item JSON
               if (data.item) {
-                setDebugText(JSON.stringify(data.item, null, 2));
+                setStreamText(JSON.stringify(data.item, null, 2));
               }
 
               // When complete, mark as done
@@ -218,7 +218,7 @@ export default function CartPage() {
           // Update debug text with the latest item
           const latestItem = cartData.menu.items[cartData.menu.items.length - 1];
           if (latestItem) {
-            setDebugText(JSON.stringify(latestItem, null, 2));
+            setStreamText(JSON.stringify(latestItem, null, 2));
           }
 
           previousItemCount.current = currentItemCount;
@@ -352,25 +352,25 @@ export default function CartPage() {
                   </div>
                 )}
 
-                {/* Debug Output */}
+                {/* Live Parsing View */}
                 {isStreaming && progressStage === 'extracting' && (
                   <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Debug: Current Item JSON
+                        Real-time Menu Extraction
                       </h3>
                       <button
-                        onClick={handleCopyDebug}
+                        onClick={handleCopyStreamData}
                         className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
                       >
                         {isCopied ? '✓ Copied!' : 'Copy'}
                       </button>
                     </div>
                     <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg text-xs overflow-x-auto max-h-64 overflow-y-auto">
-                      {debugText || 'Waiting for next item...'}
+                      {streamText || 'Waiting for next item...'}
                     </pre>
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      Shows the JSON for each item as it streams in. Container persists, text updates.
+                      Watch as AI extracts each menu item from your PDF in real-time. The view updates as new items are discovered.
                     </p>
                   </div>
                 )}
