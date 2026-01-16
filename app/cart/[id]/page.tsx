@@ -3,6 +3,7 @@
 import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import type { Menu, MenuItem, Cart, CartItem } from '@/types';
+import { TIP_PRESETS } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
 import AddItemModal from '@/app/components/add-item-modal';
 import AuthModal from '@/app/components/AuthModal';
@@ -38,6 +39,11 @@ export default function CartPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
+  // Tax and tip state
+  const [taxRate, setTaxRate] = useState<number>(0);
+  const [tipPercentage, setTipPercentage] = useState<number>(18);
+  const [customTip, setCustomTip] = useState<string>('');
+
   // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
     const savedName = localStorage.getItem('orda_user_name');
@@ -48,6 +54,14 @@ export default function CartPage() {
       setShowAuthModal(true);
     }
   }, []);
+
+  // Sync tax rate and tip percentage when data loads
+  useEffect(() => {
+    if (data) {
+      setTaxRate(data.menu.tax_rate);
+      setTipPercentage(data.cart.tip_percentage);
+    }
+  }, [data]);
 
   const handleCopyStreamData = async () => {
     if (!streamText) return;
@@ -69,6 +83,93 @@ export default function CartPage() {
     setUserName(null);
     localStorage.removeItem('orda_user_name');
     setShowAuthModal(true);
+  };
+
+  // Tax rate handler
+  const handleTaxRateChange = async (newTaxRate: number) => {
+    if (!data) return;
+
+    try {
+      const response = await fetch(`/api/menu/${data.menu.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tax_rate: newTaxRate / 100 }), // Convert percentage to decimal
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update tax rate');
+      }
+
+      setTaxRate(newTaxRate / 100);
+
+      // Refresh cart data
+      const cartResponse = await fetch(`/api/cart/${cartId}`);
+      if (cartResponse.ok) {
+        const cartData = await cartResponse.json();
+        setData(cartData);
+      }
+    } catch (err) {
+      console.error('Error updating tax rate:', err);
+      alert('Failed to update tax rate');
+    }
+  };
+
+  // Tip percentage handlers
+  const handleTipPresetClick = async (preset: number) => {
+    try {
+      const response = await fetch(`/api/cart/${cartId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tip_percentage: preset }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update tip');
+      }
+
+      setTipPercentage(preset);
+      setCustomTip('');
+
+      // Refresh cart data
+      const cartResponse = await fetch(`/api/cart/${cartId}`);
+      if (cartResponse.ok) {
+        const cartData = await cartResponse.json();
+        setData(cartData);
+      }
+    } catch (err) {
+      console.error('Error updating tip:', err);
+      alert('Failed to update tip');
+    }
+  };
+
+  const handleCustomTipChange = async (value: string) => {
+    setCustomTip(value);
+    const tipValue = parseFloat(value);
+
+    if (!isNaN(tipValue) && tipValue >= 0 && tipValue <= 100) {
+      try {
+        const response = await fetch(`/api/cart/${cartId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tip_percentage: tipValue }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update tip');
+        }
+
+        setTipPercentage(tipValue);
+
+        // Refresh cart data
+        const cartResponse = await fetch(`/api/cart/${cartId}`);
+        if (cartResponse.ok) {
+          const cartData = await cartResponse.json();
+          setData(cartData);
+        }
+      } catch (err) {
+        console.error('Error updating tip:', err);
+      }
+    }
   };
 
   // Modal handlers
@@ -438,7 +539,7 @@ export default function CartPage() {
                 </div>
                 {data.menu.restaurant_name && (
                   <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    {data.menu.location.city}, {data.menu.location.state} • Tax Rate: {(data.menu.tax_rate * 100).toFixed(2)}%
+                    {data.menu.location.city}, {data.menu.location.state}
                   </p>
                 )}
                 {data.menu.pdf_url && (
@@ -589,6 +690,74 @@ export default function CartPage() {
                 </div>
               )}
 
+              {/* Tax and Tip Settings */}
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+                  Tax & Tip
+                </h2>
+
+                <div className="space-y-4">
+                  {/* Tax Rate Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Tax Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={(taxRate * 100).toFixed(2)}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (!isNaN(value) && value >= 0 && value <= 100) {
+                          handleTaxRateChange(value);
+                        }
+                      }}
+                      className="w-24 px-3 py-2 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                    />
+                  </div>
+
+                  {/* Tip Percentage */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Tip (%)
+                    </label>
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {/* Preset buttons */}
+                      {TIP_PRESETS.map((preset) => (
+                        <button
+                          key={preset}
+                          onClick={() => handleTipPresetClick(preset)}
+                          className={`px-3 py-2 text-sm font-medium rounded-lg transition ${
+                            tipPercentage === preset && !customTip
+                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {preset}%
+                        </button>
+                      ))}
+
+                      {/* Custom tip input */}
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          placeholder="Custom"
+                          value={customTip}
+                          onChange={(e) => handleCustomTipChange(e.target.value)}
+                          className="w-20 px-3 py-2 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400"
+                        />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Stats */}
               <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
                 <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
@@ -598,14 +767,11 @@ export default function CartPage() {
                   <div>
                     <span className="font-medium">Categories:</span> {categories.length}
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <span className="font-medium">Cart ID:</span>{' '}
                     <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">
                       {cartId}
                     </code>
-                  </div>
-                  <div>
-                    <span className="font-medium">Tip:</span> {data.cart.tip_percentage}%
                   </div>
                 </div>
               </div>

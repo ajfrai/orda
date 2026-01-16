@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validatePdfUrl } from '@/lib/url-validator';
 import { analyzeMenuPdf, analyzeMenuFromUpload, analyzeMenuWithProgress, type ProgressEvent } from '@/lib/claude';
-import { getTaxRate } from '@/lib/tax-rates';
 import { getServiceRoleClient } from '@/lib/supabase';
 import type { ParseMenuRequest, ParseMenuResponse } from '@/types';
 
@@ -102,9 +101,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get tax rate based on location
-    const taxRate = getTaxRate(analysis.location?.state);
-    console.log(`Tax rate for ${analysis.location?.state || 'unknown'}: ${taxRate}`);
+    // Default tax rate to 0 - user will set it manually
+    const taxRate = 0;
+    console.log('Tax rate set to 0 (user will configure manually)');
 
     // Log analysis result for debugging
     console.log('[DEBUG] Analysis result:', JSON.stringify(analysis, null, 2));
@@ -419,8 +418,8 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
               try {
                 sendEvent('status', { message: 'Creating menu...' });
 
-                // Get tax rate
-                const taxRate = getTaxRate(metadata.location?.state);
+                // Default tax rate to 0 - user will set it manually
+                const taxRate = 0;
 
                 // Create menu with first item
                 const { data: menu, error: menuError } = await supabase
@@ -559,7 +558,8 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           // Fallback: if cart wasn't created during streaming, create it now
           sendEvent('status', { message: 'Creating cart...' });
 
-          const taxRate = getTaxRate(result.location?.state);
+          // Default tax rate to 0 - user will set it manually
+          const taxRate = 0;
           const menuItems = result.categories.flatMap((category) =>
             category.items.map((item) => ({
               category: category.category,
