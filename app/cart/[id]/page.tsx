@@ -191,7 +191,27 @@ export default function CartPage() {
 
               // Update debug text with item JSON
               if (data.item) {
+                // Console log each streamed menu item received on client
+                console.log(`[${new Date().toISOString()}] Received streamed menu item:`, {
+                  name: data.item.name,
+                  category: data.category,
+                  price: data.item.price,
+                  isEstimate: data.item.isEstimate,
+                  isSpicy: data.item.isSpicy,
+                  isVegetarian: data.item.isVegetarian,
+                  isVegan: data.item.isVegan,
+                  isGlutenFree: data.item.isGlutenFree,
+                  isKosher: data.item.isKosher,
+                });
                 setStreamText(JSON.stringify(data.item, null, 2));
+              }
+
+              // Detect end-of-stream indicator and stop polling
+              if (data.type === 'menu_extraction_end' && data.status === 'complete') {
+                console.log(`[${new Date().toISOString()}] End-of-stream indicator received - menu extraction complete`);
+                setStreamingComplete(true);
+                setProgressStage('complete');
+                sessionStorage.removeItem('menuUpload');
               }
 
               // When complete, mark as done

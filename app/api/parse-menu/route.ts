@@ -396,6 +396,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
             sendEvent('status', { message: event.message });
           } else if (event.type === 'progress') {
             sendEvent('progress', { current: event.current, total: event.total });
+          } else if (event.type === 'menu_extraction_end') {
+            // Send end-of-stream indicator to client
+            sendEvent('menu_extraction_end', { status: 'complete', type: 'menu_extraction_end' });
           } else if (event.type === 'metadata') {
             // Store metadata
             metadata = {
