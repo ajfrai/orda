@@ -9,6 +9,12 @@ interface MenuItemCardProps {
 }
 
 export default function MenuItemCard({ item, index, onAddToCart }: MenuItemCardProps) {
+  const handleClick = () => {
+    if (onAddToCart) {
+      onAddToCart(item);
+    }
+  };
+
   return (
     <div
       className="menu-item-card opacity-0"
@@ -16,7 +22,10 @@ export default function MenuItemCard({ item, index, onAddToCart }: MenuItemCardP
         animationDelay: `${index * 50}ms`,
       }}
     >
-      <div className="flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 cursor-pointer">
+      <div
+        className="flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 cursor-pointer"
+        onClick={handleClick}
+      >
         <div className="flex-1">
           {/* Item Name with Dietary Indicators */}
           <div className="flex items-center gap-2 mb-2">

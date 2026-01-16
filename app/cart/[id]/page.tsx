@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import type { Menu, MenuItem, Cart, CartItem } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
+import AddItemModal from '@/app/components/add-item-modal';
 
 interface CartResponse {
   cart: Cart;
@@ -30,6 +31,10 @@ export default function CartPage() {
   const [isCopied, setIsCopied] = useState(false);
   const parseMenuStarted = useRef(false);
 
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+
   const handleCopyStreamData = async () => {
     if (!streamText) return;
     try {
@@ -38,6 +43,54 @@ export default function CartPage() {
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  // Modal handlers
+  const handleItemClick = (item: MenuItem) => {
+    setSelectedItem(item);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedItem(null);
+  };
+
+  const handleAddToCart = async (item: MenuItem, quantity: number, notes: string) => {
+    try {
+      // Get user name from localStorage, or use 'Guest' as fallback
+      const userName = localStorage.getItem('orda_user_name') || 'Guest';
+
+      const response = await fetch(`/api/cart/${cartId}/items`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_name: userName,
+          item_name: item.name,
+          item_price: item.price,
+          is_price_estimate: item.is_estimate,
+          quantity,
+          notes,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add item to cart');
+      }
+
+      // Refresh cart data to show the new item
+      const cartResponse = await fetch(`/api/cart/${cartId}`);
+      if (cartResponse.ok) {
+        const cartData = await cartResponse.json();
+        setData(cartData);
+      }
+    } catch (err) {
+      console.error('Error adding item to cart:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add item to cart');
     }
   };
 
@@ -397,6 +450,7 @@ export default function CartPage() {
                             key={`${item.name}-${idx}`}
                             item={item}
                             index={globalStartIndex + idx}
+                            onAddToCart={handleItemClick}
                           />
                         ))}
                       </div>
@@ -464,6 +518,14 @@ export default function CartPage() {
           )}
         </div>
       </div>
+
+      {/* Add Item Modal */}
+      <AddItemModal
+        item={selectedItem}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onAdd={handleAddToCart}
+      />
     </div>
   );
 }
