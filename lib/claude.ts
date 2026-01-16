@@ -163,8 +163,8 @@ Then, output each menu item as a separate JSON object:
 {"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
 {"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
 
-Finally, output a completion marker:
-{"type": "complete"}
+Finally, output a completion marker when all menu items are extracted:
+{"status": "complete", "type": "menu_extraction_end"}
 
 DIETARY INDICATORS:
 - Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
@@ -344,6 +344,7 @@ export type ProgressEvent =
   | { type: 'progress'; current: number; total: number }
   | { type: 'metadata'; restaurantName: string; location?: { city?: string; state?: string } }
   | { type: 'item'; item: MenuItem; category: string }
+  | { type: 'menu_extraction_end' }
   | { type: 'complete'; result: MenuAnalysisResult }
   | { type: 'error'; error: string };
 
@@ -415,8 +416,8 @@ Then, output each menu item as a separate JSON object:
 {"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "isSpicy": false, "isVegetarian": true, "isVegan": false, "isGlutenFree": false, "isKosher": false}
 {"type": "item", "category": "Entrees", "name": "Burger", "description": "Classic burger", "price": 15.99, "isEstimate": false, "isSpicy": false, "isVegetarian": false, "isVegan": false, "isGlutenFree": false, "isKosher": false}
 
-Finally, output a completion marker:
-{"type": "complete"}
+Finally, output a completion marker when all menu items are extracted:
+{"status": "complete", "type": "menu_extraction_end"}
 
 DIETARY INDICATORS:
 - Set isSpicy: true for items marked with chili peppers 🌶️ or described as spicy/hot
@@ -493,21 +494,40 @@ CRITICAL:
                 location: obj.location,
               });
             } else if (obj.type === 'item') {
+              const menuItem = {
+                name: obj.name,
+                description: obj.description,
+                price: obj.price,
+                isEstimate: obj.isEstimate,
+                isSpicy: obj.isSpicy,
+                isVegetarian: obj.isVegetarian,
+                isVegan: obj.isVegan,
+                isGlutenFree: obj.isGlutenFree,
+                isKosher: obj.isKosher,
+              };
+
+              // Console log each streamed menu item
+              console.log(`[${new Date().toISOString()}] Streamed menu item:`, {
+                name: menuItem.name,
+                category: obj.category,
+                price: menuItem.price,
+                isEstimate: menuItem.isEstimate,
+                isSpicy: menuItem.isSpicy,
+                isVegetarian: menuItem.isVegetarian,
+                isVegan: menuItem.isVegan,
+                isGlutenFree: menuItem.isGlutenFree,
+                isKosher: menuItem.isKosher,
+              });
+
               onProgress({
                 type: 'item',
-                item: {
-                  name: obj.name,
-                  description: obj.description,
-                  price: obj.price,
-                  isEstimate: obj.isEstimate,
-                  isSpicy: obj.isSpicy,
-                  isVegetarian: obj.isVegetarian,
-                  isVegan: obj.isVegan,
-                  isGlutenFree: obj.isGlutenFree,
-                  isKosher: obj.isKosher,
-                },
+                item: menuItem,
                 category: obj.category,
               });
+            } else if (obj.type === 'menu_extraction_end' && obj.status === 'complete') {
+              // End-of-stream indicator - log completion and notify
+              console.log(`[${new Date().toISOString()}] Menu extraction complete - end-of-stream received`);
+              onProgress({ type: 'menu_extraction_end' });
             } else if (obj.type === 'error') {
               throw new Error(obj.message);
             }
