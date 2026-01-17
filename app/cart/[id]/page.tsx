@@ -31,6 +31,7 @@ export default function CartPage() {
   const [progressStage, setProgressStage] = useState<ProgressStage>('setup');
   const [streamText, setStreamText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isShareCopied, setIsShareCopied] = useState(false);
   const parseMenuStarted = useRef(false);
 
   // Modal state
@@ -78,6 +79,19 @@ export default function CartPage() {
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleShareCart = async () => {
+    try {
+      // Use NEXT_PUBLIC_APP_URL if available, otherwise fall back to window.location
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+      const shareUrl = `${baseUrl}/cart/${cartId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setIsShareCopied(true);
+      setTimeout(() => setIsShareCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy share link:', err);
     }
   };
 
@@ -556,6 +570,16 @@ export default function CartPage() {
                     <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                       {data.menu.restaurant_name || 'Your Order'}
                     </h1>
+                    {/* Share Button */}
+                    <button
+                      onClick={handleShareCart}
+                      className="mt-2 inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      {isShareCopied ? 'Link Copied!' : 'Share Cart'}
+                    </button>
                   </div>
 
                   {/* User Menu */}
