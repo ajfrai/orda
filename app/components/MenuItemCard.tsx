@@ -34,11 +34,11 @@ export default function MenuItemCard({ item, index, onAddToCart, onEdit }: MenuI
         className="flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 cursor-pointer relative"
         onClick={handleClick}
       >
-        {/* Edit Button */}
+        {/* Edit Button - Always visible on mobile, hover-only on desktop */}
         {onEdit && (
           <button
             onClick={handleEdit}
-            className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100"
+            className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-all md:opacity-0 md:group-hover:opacity-100"
             aria-label="Edit menu item"
             title="Edit menu item"
           >
