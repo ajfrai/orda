@@ -105,11 +105,23 @@ export default function CartPage() {
   const handleShareCart = async () => {
     try {
       const shareUrl = window.location.href.split('?')[0]; // Remove query params
-      await navigator.clipboard.writeText(shareUrl);
-      setIsShareCopied(true);
-      setTimeout(() => setIsShareCopied(false), 2000);
+
+      // Try native share API first (mobile)
+      if (navigator.share) {
+        await navigator.share({
+          title: data?.menu.restaurant_name || 'Join my order',
+          text: 'Add your items to our group order!',
+          url: shareUrl,
+        });
+      } else {
+        // Fallback to clipboard (desktop)
+        await navigator.clipboard.writeText(shareUrl);
+        setIsShareCopied(true);
+        setTimeout(() => setIsShareCopied(false), 2000);
+      }
     } catch (err) {
-      console.error('Failed to copy share link:', err);
+      // User cancelled or share failed, ignore
+      console.error('Failed to share:', err);
     }
   };
 
@@ -662,6 +674,28 @@ export default function CartPage() {
             <>
               {/* Header */}
               <div className="mb-6">
+                {/* Share Button - Prominent at top */}
+                <button
+                  onClick={handleShareCart}
+                  className="w-full mb-6 px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg shadow-lg hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                >
+                  {isShareCopied ? (
+                    <>
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      <span>Share Cart with Friends</span>
+                    </>
+                  )}
+                </button>
+
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -669,29 +703,8 @@ export default function CartPage() {
                     </h1>
                   </div>
 
-                  {/* Share Button and User Menu */}
+                  {/* User Menu */}
                   <div className="flex items-center gap-3">
-                    {/* Share Button */}
-                    <button
-                      onClick={handleShareCart}
-                      className="px-4 py-2 bg-white dark:bg-gray-700 border-2 border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 rounded-lg font-medium hover:bg-indigo-50 dark:hover:bg-gray-600 transition flex items-center gap-2"
-                    >
-                      {isShareCopied ? (
-                        <>
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                          </svg>
-                          <span>Share</span>
-                        </>
-                      )}
-                    </button>
                     {userName ? (
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-gray-600 dark:text-gray-300">
