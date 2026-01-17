@@ -77,6 +77,11 @@ export default function CartPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Scroll to top when switching tabs
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
   // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
     const savedName = localStorage.getItem('orda_user_name');
