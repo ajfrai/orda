@@ -44,10 +44,6 @@ export interface CartItem {
 
 // API request/response types
 
-export interface ParseMenuRequest {
-  pdfUrl: string;
-}
-
 export interface ParseMenuResponse {
   cartId: string;
   restaurantName: string;

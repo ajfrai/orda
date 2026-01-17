@@ -522,27 +522,21 @@ export default function CartPage() {
 
       try {
         const uploadData = JSON.parse(uploadDataStr);
-        let body: any;
-        let headers: HeadersInit = {
+
+        // Convert base64 back to blob
+        const fileResponse = await fetch(uploadData.fileData);
+        const blob = await fileResponse.blob();
+        const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('cartId', cartId);
+
+        const headers: HeadersInit = {
           'Accept': 'text/event-stream',
         };
 
-        if (uploadData.mode === 'url') {
-          headers['Content-Type'] = 'application/json';
-          body = JSON.stringify({ pdfUrl: uploadData.url, cartId });
-        } else if (uploadData.mode === 'upload') {
-          // Convert base64 back to blob
-          const response = await fetch(uploadData.fileData);
-          const blob = await response.blob();
-          const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
-
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('cartId', cartId);
-          body = formData;
-        }
-
-        console.log('[DEBUG] Starting parse-menu streaming:', uploadData.mode);
+        console.log('[DEBUG] Starting parse-menu streaming');
 
         // Transition from setup to parsing phase
         setProgressStage('parsing');
@@ -550,7 +544,7 @@ export default function CartPage() {
         const response = await fetch('/api/parse-menu', {
           method: 'POST',
           headers,
-          body,
+          body: formData,
         });
 
         if (!response.ok) {

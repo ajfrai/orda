@@ -1,13 +1,12 @@
 /**
  * POST /api/parse-menu
- * Fetches PDF from URL, validates it, parses with Claude vision, creates menu + cart
+ * Parses menu from uploaded file with Claude vision, creates menu + cart
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { validatePdfUrl } from '@/lib/url-validator';
-import { analyzeMenuPdf, analyzeMenuFromUpload, analyzeMenuWithProgress, type ProgressEvent } from '@/lib/claude';
+import { analyzeMenuFromUpload, analyzeMenuWithProgress, type ProgressEvent } from '@/lib/claude';
 import { getServiceRoleClient } from '@/lib/supabase';
-import type { ParseMenuRequest, ParseMenuResponse } from '@/types';
+import type { ParseMenuResponse } from '@/types';
 
 interface FileData {
   base64: string;
@@ -26,64 +25,40 @@ export async function POST(request: NextRequest) {
       return handleStreamingRequest(request, contentType);
     }
 
-    // Original non-streaming logic
-    let analysis;
-    let sourceUrl: string | null = null;
+    // Handle file upload
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
 
-    // Check if it's a file upload or URL
-    if (contentType.includes('multipart/form-data')) {
-      // Handle file upload
-      const formData = await request.formData();
-      const file = formData.get('file') as File;
-
-      if (!file) {
-        return NextResponse.json(
-          { error: 'No file provided' },
-          { status: 400 }
-        );
-      }
-
-      // Validate file type
-      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        return NextResponse.json(
-          { error: 'Invalid file type. Please upload a PDF or image file.' },
-          { status: 400 }
-        );
-      }
-
-      // Validate file size (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: 'File is too large. Maximum size is 10MB.' },
-          { status: 400 }
-        );
-      }
-
-      // Convert to buffer
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      console.log('Analyzing uploaded file:', file.name, file.type);
-      analysis = await analyzeMenuFromUpload(buffer, file.type);
-    } else {
-      // Handle URL
-      const body: ParseMenuRequest = await request.json();
-      const { pdfUrl } = body;
-
-      // Validate URL
-      const validation = validatePdfUrl(pdfUrl);
-      if (!validation.valid) {
-        return NextResponse.json(
-          { error: validation.error },
-          { status: 400 }
-        );
-      }
-
-      console.log('Analyzing menu from URL:', validation.url?.toString());
-      analysis = await analyzeMenuPdf(pdfUrl);
-      sourceUrl = pdfUrl;
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      );
     }
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      return NextResponse.json(
+        { error: 'Invalid file type. Please upload a PDF or image file.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'File is too large. Maximum size is 10MB.' },
+        { status: 400 }
+      );
+    }
+
+    // Convert to buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    console.log('Analyzing uploaded file:', file.name, file.type);
+    const analysis = await analyzeMenuFromUpload(buffer, file.type);
 
     // Check if it's a valid menu
     if (!analysis.isMenu) {
@@ -131,7 +106,7 @@ export async function POST(request: NextRequest) {
     const { data: menu, error: menuError } = await supabase
       .from('menus')
       .insert({
-        pdf_url: sourceUrl || null,
+        pdf_url: null,
         restaurant_name: analysis.restaurantName,
         location_city: analysis.location?.city || null,
         location_state: analysis.location?.state || null,
@@ -226,7 +201,6 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
     async start(controller) {
       try {
         let fileData: FileData;
-        let sourceUrl: string | null = null;
         let existingCartId: string | null = null;
 
         // Helper to send SSE message
@@ -235,148 +209,40 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           controller.enqueue(encoder.encode(message));
         };
 
-        // Parse file data based on content type
-        if (contentType.includes('multipart/form-data')) {
-          // Handle file upload
-          const formData = await request.formData();
-          const file = formData.get('file') as File;
-          existingCartId = formData.get('cartId') as string | null;
+        // Handle file upload
+        const formData = await request.formData();
+        const file = formData.get('file') as File;
+        existingCartId = formData.get('cartId') as string | null;
 
-          if (!file) {
-            sendEvent('error', { error: 'No file provided' });
-            controller.close();
-            return;
-          }
-
-          // Validate file
-          const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-          if (!validTypes.includes(file.type)) {
-            sendEvent('error', { error: 'Invalid file type. Please upload a PDF or image file.' });
-            controller.close();
-            return;
-          }
-
-          if (file.size > 10 * 1024 * 1024) {
-            sendEvent('error', { error: 'File is too large. Maximum size is 10MB.' });
-            controller.close();
-            return;
-          }
-
-          // Convert to FileData
-          const arrayBuffer = await file.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-
-          fileData = {
-            base64: buffer.toString('base64'),
-            mediaType: file.type,
-            isDocument: file.type === 'application/pdf',
-          };
-        } else {
-          // Handle URL
-          const body: ParseMenuRequest & { cartId?: string } = await request.json();
-          const { pdfUrl, cartId } = body;
-          existingCartId = cartId || null;
-
-          // Validate URL
-          const validation = validatePdfUrl(pdfUrl);
-          if (!validation.valid) {
-            sendEvent('error', { error: validation.error });
-            controller.close();
-            return;
-          }
-
-          sourceUrl = pdfUrl;
-
-          // Fetch file data with retry logic
-          sendEvent('status', { message: 'Fetching menu file...' });
-
-          let response;
-          let lastError;
-          const maxRetries = 2;
-
-          for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-              if (attempt > 0) {
-                sendEvent('status', { message: `Retrying... (attempt ${attempt + 1}/${maxRetries + 1})` });
-                // Wait before retrying (exponential backoff: 1s, 2s)
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
-              }
-
-              response = await fetch(pdfUrl, {
-                headers: { 'User-Agent': 'Orda-Menu-Parser/1.0' },
-                signal: AbortSignal.timeout(30000),
-              });
-
-              // Success! Break out of retry loop
-              break;
-            } catch (fetchError) {
-              lastError = fetchError;
-              // If this is not the last attempt, continue to retry
-              if (attempt < maxRetries) {
-                continue;
-              }
-            }
-          }
-
-          // If we exhausted all retries, handle the error
-          if (!response) {
-            const fetchError = lastError;
-            const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
-            let userMessage = 'Failed to fetch file from URL.';
-
-            if (errorMsg.includes('aborted') || errorMsg.includes('timeout')) {
-              userMessage = 'Request timeout: The file took too long to download (30s limit). The server may be slow or the file may be too large.';
-            } else if (errorMsg.includes('Failed to fetch') || errorMsg === 'Load failed') {
-              userMessage = 'Network request failed. This is usually temporary - the server may be rate limiting, temporarily unavailable, or experiencing issues. Wait a minute and try again, or upload the file directly.';
-            } else if (errorMsg.includes('CORS')) {
-              userMessage = 'CORS error: The server is blocking cross-origin requests. Try uploading the file directly instead.';
-            } else {
-              userMessage = `Network error: ${errorMsg}. Try uploading the file directly instead.`;
-            }
-
-            sendEvent('error', { error: userMessage });
-            controller.close();
-            return;
-          }
-
-          if (!response.ok) {
-            const statusMessages: Record<number, string> = {
-              403: 'Access forbidden. The URL may require authentication or block automated requests.',
-              404: 'File not found. The URL may be incorrect or the file may have been moved.',
-              500: 'Server error. The website hosting the file is experiencing issues.',
-              503: 'Service unavailable. The website is temporarily down.',
-            };
-
-            const errorMsg = statusMessages[response.status] ||
-              `HTTP ${response.status}: Failed to fetch file. The file may not be publicly accessible.`;
-
-            sendEvent('error', { error: errorMsg });
-            controller.close();
-            return;
-          }
-
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-          const contentTypeHeader = response.headers.get('content-type') || '';
-
-          let mediaType = contentTypeHeader;
-          let isDocument = false;
-
-          if (contentTypeHeader.includes('pdf')) {
-            mediaType = 'application/pdf';
-            isDocument = true;
-          } else if (contentTypeHeader.includes('jpeg') || contentTypeHeader.includes('jpg')) {
-            mediaType = 'image/jpeg';
-          } else if (contentTypeHeader.includes('png')) {
-            mediaType = 'image/png';
-          }
-
-          fileData = {
-            base64: buffer.toString('base64'),
-            mediaType,
-            isDocument,
-          };
+        if (!file) {
+          sendEvent('error', { error: 'No file provided' });
+          controller.close();
+          return;
         }
+
+        // Validate file
+        const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+          sendEvent('error', { error: 'Invalid file type. Please upload a PDF or image file.' });
+          controller.close();
+          return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+          sendEvent('error', { error: 'File is too large. Maximum size is 10MB.' });
+          controller.close();
+          return;
+        }
+
+        // Convert to FileData
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        fileData = {
+          base64: buffer.toString('base64'),
+          mediaType: file.type,
+          isDocument: file.type === 'application/pdf',
+        };
 
         // Track state for incremental menu creation
         let cartId: string | null = null;
@@ -425,7 +291,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
                 const { data: menu, error: menuError } = await supabase
                   .from('menus')
                   .insert({
-                    pdf_url: sourceUrl || null,
+                    pdf_url: null,
                     restaurant_name: metadata.restaurantName,
                     location_city: metadata.location?.city || null,
                     location_state: metadata.location?.state || null,
@@ -574,7 +440,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           const { data: menu, error: menuError } = await supabase
             .from('menus')
             .insert({
-              pdf_url: sourceUrl || null,
+              pdf_url: null,
               restaurant_name: result.restaurantName,
               location_city: result.location?.city || null,
               location_state: result.location?.state || null,
