@@ -47,8 +47,12 @@ export default function CartPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [startX, setStartX] = useState(0);
+  const [hasMetDragThreshold, setHasMetDragThreshold] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Drag threshold in pixels - must drag this far before it's considered a swipe
+  const DRAG_THRESHOLD = 10;
 
   // Tax and tip state
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -317,14 +321,26 @@ export default function CartPage() {
   // Swipe gesture handlers
   const handleTouchStart = (e: React.TouchEvent) => {
     if (!isMobile) return;
-    setIsDragging(true);
     setStartX(e.touches[0].clientX);
+    setIsDragging(true);
+    setHasMetDragThreshold(false);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isMobile || !isDragging) return;
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX;
+    const absDiff = Math.abs(diff);
+
+    // Only start dragging if we've moved past the threshold
+    if (!hasMetDragThreshold && absDiff < DRAG_THRESHOLD) {
+      return;
+    }
+
+    // Mark that we've met the drag threshold
+    if (!hasMetDragThreshold && absDiff >= DRAG_THRESHOLD) {
+      setHasMetDragThreshold(true);
+    }
 
     // Limit drag to screen width
     const maxDrag = window.innerWidth;
@@ -343,6 +359,7 @@ export default function CartPage() {
   const handleTouchEnd = () => {
     if (!isMobile || !isDragging) return;
     setIsDragging(false);
+    setHasMetDragThreshold(false);
 
     const threshold = window.innerWidth * 0.3; // 30% of screen width
 
@@ -359,14 +376,26 @@ export default function CartPage() {
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!isMobile) return;
-    setIsDragging(true);
     setStartX(e.clientX);
+    setIsDragging(true);
+    setHasMetDragThreshold(false);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isMobile || !isDragging) return;
     const currentX = e.clientX;
     const diff = currentX - startX;
+    const absDiff = Math.abs(diff);
+
+    // Only start dragging if we've moved past the threshold
+    if (!hasMetDragThreshold && absDiff < DRAG_THRESHOLD) {
+      return;
+    }
+
+    // Mark that we've met the drag threshold
+    if (!hasMetDragThreshold && absDiff >= DRAG_THRESHOLD) {
+      setHasMetDragThreshold(true);
+    }
 
     const maxDrag = window.innerWidth;
     const limitedDiff = Math.max(-maxDrag, Math.min(maxDrag, diff));
@@ -381,6 +410,7 @@ export default function CartPage() {
   const handlePointerUp = () => {
     if (!isMobile || !isDragging) return;
     setIsDragging(false);
+    setHasMetDragThreshold(false);
 
     const threshold = window.innerWidth * 0.3;
 
@@ -401,7 +431,16 @@ export default function CartPage() {
       // Get upload data from sessionStorage
       const uploadDataStr = sessionStorage.getItem('menuUpload');
       if (!uploadDataStr) {
-        setError('No upload data found. Please try again.');
+        // If no upload data but cart already has menu data, just skip streaming
+        // This happens when user refreshes after streaming completes
+        if (data && data.menu && data.menu.items && data.menu.items.length > 0) {
+          setStreamingComplete(true);
+          setProgressStage('complete');
+          return;
+        }
+
+        // Otherwise show error
+        setError('No upload data found. Please try uploading your menu again from the home page.');
         setLoading(false);
         return;
       }
@@ -838,7 +877,7 @@ export default function CartPage() {
                       {streamText || 'Waiting for next item...'}
                     </pre>
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      Watch as AI extracts each menu item from your PDF in real-time. The view updates as new items are discovered.
+                      Items are being extracted and added to the menu below in real-time.
                     </p>
                   </div>
                 )}
@@ -856,7 +895,7 @@ export default function CartPage() {
               >
                 <div
                   ref={contentRef}
-                  className={`flex transition-transform ${isDragging ? 'duration-0' : 'duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]'}`}
+                  className={`flex transition-transform ${hasMetDragThreshold ? 'duration-0' : 'duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]'}`}
                   style={{
                     transform: `translateX(calc(${activeTab === 'menu' ? '0%' : '-100%'} + ${dragOffset}px))`,
                   }}
@@ -865,9 +904,9 @@ export default function CartPage() {
                   <div
                     className="w-full flex-shrink-0 space-y-8"
                     style={{
-                      pointerEvents: activeTab === 'menu' && !isDragging ? 'auto' : 'none',
-                      opacity: isDragging && activeTab === 'order' && dragOffset > 0 ? 0.98 : 1,
-                      transform: isDragging && activeTab === 'order' && dragOffset > 0 ? 'scale(0.98)' : 'scale(1)',
+                      pointerEvents: activeTab === 'menu' && !hasMetDragThreshold ? 'auto' : 'none',
+                      opacity: hasMetDragThreshold && activeTab === 'order' && dragOffset > 0 ? 0.98 : 1,
+                      transform: hasMetDragThreshold && activeTab === 'order' && dragOffset > 0 ? 'scale(0.98)' : 'scale(1)',
                     }}
                   >
                     {categories.map((category) => {
@@ -901,9 +940,9 @@ export default function CartPage() {
                   <div
                     className="w-full flex-shrink-0 space-y-8 pl-6"
                     style={{
-                      pointerEvents: activeTab === 'order' && !isDragging ? 'auto' : 'none',
-                      opacity: isDragging && activeTab === 'menu' && dragOffset < 0 ? 0.98 : 1,
-                      transform: isDragging && activeTab === 'menu' && dragOffset < 0 ? 'scale(0.98)' : 'scale(1)',
+                      pointerEvents: activeTab === 'order' && !hasMetDragThreshold ? 'auto' : 'none',
+                      opacity: hasMetDragThreshold && activeTab === 'menu' && dragOffset < 0 ? 0.98 : 1,
+                      transform: hasMetDragThreshold && activeTab === 'menu' && dragOffset < 0 ? 'scale(0.98)' : 'scale(1)',
                     }}
                   >
                     {/* Cart Items Section */}
