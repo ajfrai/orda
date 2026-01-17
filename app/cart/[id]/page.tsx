@@ -8,6 +8,7 @@ import MenuItemCard from '@/app/components/MenuItemCard';
 import AddItemModal from '@/app/components/add-item-modal';
 import EditItemModal from '@/app/components/edit-item-modal';
 import AuthModal from '@/app/components/AuthModal';
+import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
 
 interface CartResponse {
   cart: Cart;
@@ -42,6 +43,7 @@ export default function CartPage() {
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isWhoOwesWhatModalOpen, setIsWhoOwesWhatModalOpen] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
@@ -1156,6 +1158,21 @@ export default function CartPage() {
                       </div>
                     </div>
 
+                    {/* Who Owes What Button */}
+                    {data.cartItems.length > 0 && (
+                      <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => setIsWhoOwesWhatModalOpen(true)}
+                          className="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg shadow-lg hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          <span>See Who Owes What</span>
+                        </button>
+                      </div>
+                    )}
+
                     {/* Stats */}
                     <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
                       <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
@@ -1195,6 +1212,16 @@ export default function CartPage() {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onUpdate={handleUpdateCartItem}
+      />
+
+      {/* Who Owes What Modal */}
+      <WhoOwesWhatModal
+        isOpen={isWhoOwesWhatModalOpen}
+        onClose={() => setIsWhoOwesWhatModalOpen(false)}
+        cartItems={data?.cartItems || []}
+        taxRate={taxRate}
+        tipPercentage={tipPercentage}
+        restaurantName={data?.menu.restaurant_name || 'Your Order'}
       />
     </div>
   );
