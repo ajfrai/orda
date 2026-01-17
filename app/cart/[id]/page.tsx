@@ -407,9 +407,14 @@ export default function CartPage() {
       // Get upload data from sessionStorage
       const uploadDataStr = sessionStorage.getItem('menuUpload');
       if (!uploadDataStr) {
+        // If cart data hasn't loaded yet, wait for it before deciding
+        if (!data) {
+          return;
+        }
+
         // If no upload data but cart already has menu data, just skip streaming
         // This happens when user refreshes after streaming completes
-        if (data && data.menu && data.menu.items && data.menu.items.length > 0) {
+        if (data.menu && data.menu.items && data.menu.items.length > 0) {
           setStreamingComplete(true);
           setProgressStage('complete');
           return;
@@ -545,7 +550,7 @@ export default function CartPage() {
     }
 
     startParsing();
-  }, [cartId, isStreaming, progressStage]);
+  }, [cartId, isStreaming, progressStage, data]);
 
   // Fetch cart data initially
   useEffect(() => {
