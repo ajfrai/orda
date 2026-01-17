@@ -43,7 +43,7 @@ export default function CartPage() {
   const [taxRate, setTaxRate] = useState<number>(0);
   const [tipPercentage, setTipPercentage] = useState<number>(18);
   const [customTip, setCustomTip] = useState<string>('');
-  const [taxInputValue, setTaxInputValue] = useState<string>('0.00');
+  const [taxInputValue, setTaxInputValue] = useState<string>('');
   const taxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -63,9 +63,12 @@ export default function CartPage() {
     if (data) {
       setTaxRate(data.menu.tax_rate);
       setTipPercentage(data.cart.tip_percentage);
-      setTaxInputValue((data.menu.tax_rate * 100).toFixed(2));
+      // Only populate input if it's empty (first load)
+      if (taxInputValue === '') {
+        setTaxInputValue(data.menu.tax_rate > 0 ? String(data.menu.tax_rate * 100) : '');
+      }
     }
-  }, [data]);
+  }, [data, taxInputValue]);
 
   const handleCopyStreamData = async () => {
     if (!streamText) return;
@@ -136,8 +139,7 @@ export default function CartPage() {
       }
     } catch (err) {
       console.error('Error updating tax rate:', err);
-      // Revert input on error
-      setTaxInputValue((taxRate * 100).toFixed(2));
+      // Keep user's input as-is on error
     }
   };
 
@@ -761,9 +763,10 @@ export default function CartPage() {
                         min="0"
                         max="100"
                         step="0.01"
+                        placeholder="0"
                         value={taxInputValue}
                         onChange={(e) => handleTaxInputChange(e.target.value)}
-                        className="w-28 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
+                        className="w-28 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
                       />
                       <span className="text-base font-medium text-gray-600 dark:text-gray-400">%</span>
                     </div>
