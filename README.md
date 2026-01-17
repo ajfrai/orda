@@ -2,7 +2,7 @@
 
 Shared menu ordering app. Paste a restaurant menu PDF, get a shareable cart where friends can collaboratively build an order with automatic cost splitting.
 
-> **For AI Assistants / Claude Code**: Read `PROGRESS.md` before starting any development work on this project. It contains current status, build order, and session history.
+> **For AI Assistants / Claude Code**: Read `CLAUDE.md` first for comprehensive codebase documentation, then check `PLAN.md` for architecture details.
 
 ## Quick Start
 
@@ -15,7 +15,7 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Documentation
 
-- **[PROGRESS.md](./PROGRESS.md)** - Current development status and session log (READ THIS FIRST)
+- **[CLAUDE.md](./CLAUDE.md)** - AI assistant guidelines and comprehensive codebase reference (READ THIS FIRST)
 - **[PLAN.md](./PLAN.md)** - Architecture, design decisions, and technical spec
 - **[GitHub Issues](https://github.com/ajfrai/orda/issues)** - Implementation tasks
 
