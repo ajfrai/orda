@@ -10,7 +10,7 @@ All work assignments come from one of two sources:
 ### Reading GitHub Issues
 
 To fetch and review GitHub issues, you must read environment variables to obtain the access token:
-- Check for `GITHUB_TOKEN` or `GH_TOKEN` environment variable
+- Check for `GHTOKEN` environment variable
 - If no access token is available, **stop and inform the user** before proceeding with GitHub issue retrieval
 - Use the access token to authenticate API requests to GitHub
 
