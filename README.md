@@ -1,4 +1,4 @@
-# Orda
+# Orden
 
 Shared menu ordering app. Paste a restaurant menu PDF, get a shareable cart where friends can collaboratively build an order with automatic cost splitting.
 
