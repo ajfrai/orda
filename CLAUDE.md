@@ -1,5 +1,21 @@
 # Claude Code Assistant Guidelines
 
+## Work Sources
+
+All work assignments come from one of two sources:
+
+1. **Direct Feature Requests**: Tasks provided directly in prompts by the user
+2. **GitHub Issues**: Tasks tracked in the project's GitHub repository
+
+### Reading GitHub Issues
+
+To fetch and review GitHub issues, you must read environment variables to obtain the access token:
+- Check for `GITHUB_TOKEN` or `GH_TOKEN` environment variable
+- If no access token is available, **stop and inform the user** before proceeding with GitHub issue retrieval
+- Use the access token to authenticate API requests to GitHub
+
+---
+
 ## Project Status
 
 Track work through:
