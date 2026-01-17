@@ -700,22 +700,22 @@ export default function CartPage() {
                 {/* Tab Navigation */}
                 <div className="mt-6 flex gap-2 border-b border-gray-200 dark:border-gray-700">
                   <button
-                    onClick={() => !isMobile && setActiveTab('menu')}
-                    className={`relative px-6 py-3 font-semibold transition-all ${
+                    onClick={() => setActiveTab('menu')}
+                    className={`relative px-6 py-3 font-semibold transition-all cursor-pointer ${
                       activeTab === 'menu'
                         ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                    } ${isMobile ? 'cursor-default' : 'cursor-pointer'}`}
+                    }`}
                   >
                     Menu
                   </button>
                   <button
-                    onClick={() => !isMobile && setActiveTab('order')}
-                    className={`relative px-6 py-3 font-semibold transition-all ${
+                    onClick={() => setActiveTab('order')}
+                    className={`relative px-6 py-3 font-semibold transition-all cursor-pointer ${
                       activeTab === 'order'
                         ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
                         : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                    } ${isMobile ? 'cursor-default' : 'cursor-pointer'}`}
+                    }`}
                   >
                     Order
                     {data.cartItems.length > 0 && (
