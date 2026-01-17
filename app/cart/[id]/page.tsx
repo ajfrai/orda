@@ -376,11 +376,7 @@ export default function CartPage() {
                   category: data.category,
                   price: data.item.price,
                   isEstimate: data.item.isEstimate,
-                  isSpicy: data.item.isSpicy,
-                  isVegetarian: data.item.isVegetarian,
-                  isVegan: data.item.isVegan,
-                  isGlutenFree: data.item.isGlutenFree,
-                  isKosher: data.item.isKosher,
+                  chips: data.item.chips,
                 });
                 setStreamText(JSON.stringify(data.item, null, 2));
               }
