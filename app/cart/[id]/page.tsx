@@ -39,6 +39,16 @@ export default function CartPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
 
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
+
+  // Swipe state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [startX, setStartX] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
   // Tax and tip state
   const [taxRate, setTaxRate] = useState<number>(0);
   const [tipPercentage, setTipPercentage] = useState<number>(18);
@@ -46,6 +56,16 @@ export default function CartPage() {
   const [taxInputValue, setTaxInputValue] = useState<string>('');
   const taxTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
@@ -268,6 +288,85 @@ export default function CartPage() {
       console.error('Error adding item to cart:', err);
       alert(err instanceof Error ? err.message : 'Failed to add item to cart');
     }
+  };
+
+  // Swipe gesture handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return;
+    setIsDragging(true);
+    setStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX;
+
+    // Limit drag to screen width
+    const maxDrag = window.innerWidth;
+    const limitedDiff = Math.max(-maxDrag, Math.min(maxDrag, diff));
+
+    // Apply drag direction logic:
+    // - On Menu tab: only allow left swipe (negative offset) to peek Order
+    // - On Order tab: only allow right swipe (positive offset) to peek Menu
+    if (activeTab === 'menu' && limitedDiff < 0) {
+      setDragOffset(limitedDiff);
+    } else if (activeTab === 'order' && limitedDiff > 0) {
+      setDragOffset(limitedDiff);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isMobile || !isDragging) return;
+    setIsDragging(false);
+
+    const threshold = window.innerWidth * 0.3; // 30% of screen width
+
+    // Switch tabs if dragged past threshold
+    if (activeTab === 'menu' && dragOffset < -threshold) {
+      setActiveTab('order');
+    } else if (activeTab === 'order' && dragOffset > threshold) {
+      setActiveTab('menu');
+    }
+
+    // Reset offset with animation
+    setDragOffset(0);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isMobile) return;
+    setIsDragging(true);
+    setStartX(e.clientX);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isMobile || !isDragging) return;
+    const currentX = e.clientX;
+    const diff = currentX - startX;
+
+    const maxDrag = window.innerWidth;
+    const limitedDiff = Math.max(-maxDrag, Math.min(maxDrag, diff));
+
+    if (activeTab === 'menu' && limitedDiff < 0) {
+      setDragOffset(limitedDiff);
+    } else if (activeTab === 'order' && limitedDiff > 0) {
+      setDragOffset(limitedDiff);
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (!isMobile || !isDragging) return;
+    setIsDragging(false);
+
+    const threshold = window.innerWidth * 0.3;
+
+    if (activeTab === 'menu' && dragOffset < -threshold) {
+      setActiveTab('order');
+    } else if (activeTab === 'order' && dragOffset > threshold) {
+      setActiveTab('menu');
+    }
+
+    setDragOffset(0);
   };
 
   // Start parse-menu streaming when streaming=true
@@ -550,7 +649,7 @@ export default function CartPage() {
           {data && (
             <>
               {/* Header */}
-              <div className="mb-8">
+              <div className="mb-6">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -597,6 +696,35 @@ export default function CartPage() {
                     View original menu
                   </a>
                 )}
+
+                {/* Tab Navigation */}
+                <div className="mt-6 flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => !isMobile && setActiveTab('menu')}
+                    className={`relative px-6 py-3 font-semibold transition-all ${
+                      activeTab === 'menu'
+                        ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    } ${isMobile ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    Menu
+                  </button>
+                  <button
+                    onClick={() => !isMobile && setActiveTab('order')}
+                    className={`relative px-6 py-3 font-semibold transition-all ${
+                      activeTab === 'order'
+                        ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    } ${isMobile ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    Order
+                    {data.cartItems.length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {data.cartItems.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
                 {isStreaming && !streamingComplete && (
                   <div className="mt-4 space-y-2 text-sm">
                     {/* Setup phase */}
@@ -670,164 +798,203 @@ export default function CartPage() {
                 )}
               </div>
 
-              {/* Menu Items by Category */}
-              <div className="space-y-8">
-                {categories.map((category) => {
-                  // Calculate the starting index for this category
-                  const previousCategories = categories.slice(0, categories.indexOf(category));
-                  const globalStartIndex = previousCategories.reduce(
-                    (sum, cat) => sum + groupedItems![cat].length,
-                    0
-                  );
+              {/* Tab Content Container with Swipe Support */}
+              <div
+                className="relative overflow-hidden touch-pan-y"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+              >
+                <div
+                  ref={contentRef}
+                  className={`flex transition-transform ${isDragging ? 'duration-0' : 'duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]'}`}
+                  style={{
+                    transform: `translateX(calc(${activeTab === 'menu' ? '0%' : '-100%'} + ${dragOffset}px))`,
+                  }}
+                >
+                  {/* Menu Tab Content */}
+                  <div
+                    className="w-full flex-shrink-0 space-y-8"
+                    style={{
+                      pointerEvents: activeTab === 'menu' && !isDragging ? 'auto' : 'none',
+                      opacity: isDragging && activeTab === 'order' && dragOffset > 0 ? 0.98 : 1,
+                      transform: isDragging && activeTab === 'order' && dragOffset > 0 ? 'scale(0.98)' : 'scale(1)',
+                    }}
+                  >
+                    {categories.map((category) => {
+                      const previousCategories = categories.slice(0, categories.indexOf(category));
+                      const globalStartIndex = previousCategories.reduce(
+                        (sum, cat) => sum + groupedItems![cat].length,
+                        0
+                      );
 
-                  return (
-                    <div key={category}>
-                      <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
-                        {category}
-                      </h2>
-                      <div className="space-y-3">
-                        {groupedItems![category].map((item, idx) => (
-                          <MenuItemCard
-                            key={`${item.name}-${idx}`}
-                            item={item}
-                            index={globalStartIndex + idx}
-                            onAddToCart={handleItemClick}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Cart Items Section */}
-              {data.cartItems.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-gray-200 dark:border-gray-700">
-                  <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
-                    Current Orders
-                  </h2>
-                  <div className="space-y-2">
-                    {data.cartItems.map((cartItem) => (
-                      <div
-                        key={cartItem.id}
-                        className="flex justify-between items-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg"
-                      >
-                        <div>
-                          <span className="font-medium text-gray-900 dark:text-gray-100">
-                            {cartItem.user_name}
-                          </span>
-                          <span className="text-gray-600 dark:text-gray-400 mx-2">•</span>
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {cartItem.quantity}x {cartItem.item_name}
-                          </span>
-                          {cartItem.notes && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              Note: {cartItem.notes}
-                            </p>
-                          )}
+                      return (
+                        <div key={category}>
+                          <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
+                            {category}
+                          </h2>
+                          <div className="space-y-3">
+                            {groupedItems![category].map((item, idx) => (
+                              <MenuItemCard
+                                key={`${item.name}-${idx}`}
+                                item={item}
+                                index={globalStartIndex + idx}
+                                onAddToCart={handleItemClick}
+                              />
+                            ))}
+                          </div>
                         </div>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">
-                          ${(cartItem.item_price * cartItem.quantity).toFixed(2)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                </div>
-              )}
 
-              {/* Tax and Tip Settings */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-gray-100">
-                  Tax & Tip
-                </h2>
+                  {/* Order Tab Content */}
+                  <div
+                    className="w-full flex-shrink-0 space-y-8 pl-6"
+                    style={{
+                      pointerEvents: activeTab === 'order' && !isDragging ? 'auto' : 'none',
+                      opacity: isDragging && activeTab === 'menu' && dragOffset < 0 ? 0.98 : 1,
+                      transform: isDragging && activeTab === 'menu' && dragOffset < 0 ? 'scale(0.98)' : 'scale(1)',
+                    }}
+                  >
+                    {/* Cart Items Section */}
+                    {data.cartItems.length > 0 ? (
+                      <div>
+                        <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">
+                          Current Orders
+                        </h2>
+                        <div className="space-y-2">
+                          {data.cartItems.map((cartItem) => (
+                            <div
+                              key={cartItem.id}
+                              className="flex justify-between items-center p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg"
+                            >
+                              <div>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {cartItem.user_name}
+                                </span>
+                                <span className="text-gray-600 dark:text-gray-400 mx-2">•</span>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                  {cartItem.quantity}x {cartItem.item_name}
+                                </span>
+                                {cartItem.notes && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                    Note: {cartItem.notes}
+                                  </p>
+                                )}
+                              </div>
+                              <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                ${(cartItem.item_price * cartItem.quantity).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-500 dark:text-gray-400">No items in order yet. Browse the menu to add items!</p>
+                      </div>
+                    )}
 
-                <div className="space-y-6">
-                  {/* Tax Rate Input */}
-                  <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Tax Rate
-                      </label>
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        ${taxAmount.toFixed(2)}
+                    {/* Tax and Tip Settings */}
+                    <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                      <h2 className="text-xl font-bold mb-6 text-gray-800 dark:text-gray-100">
+                        Tax & Tip
+                      </h2>
+
+                      <div className="space-y-6">
+                        {/* Tax Rate Input */}
+                        <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              Tax Rate
+                            </label>
+                            <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              ${taxAmount.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              placeholder="0"
+                              value={taxInputValue}
+                              onChange={(e) => handleTaxInputChange(e.target.value)}
+                              className="w-28 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
+                            />
+                            <span className="text-base font-medium text-gray-600 dark:text-gray-400">%</span>
+                          </div>
+                        </div>
+
+                        {/* Tip Percentage */}
+                        <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
+                          <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                              Tip
+                            </label>
+                            <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                              ${tipAmount.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-center">
+                            {/* Preset buttons */}
+                            {TIP_PRESETS.map((preset) => (
+                              <button
+                                key={preset}
+                                onClick={() => handleTipPresetClick(preset)}
+                                className={`min-w-[60px] px-4 py-3 text-base font-semibold rounded-xl transition-all ${
+                                  tipPercentage === preset && !customTip
+                                    ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-gray-200 dark:border-gray-600'
+                                }`}
+                              >
+                                {preset}%
+                              </button>
+                            ))}
+
+                            {/* Custom tip input */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                placeholder="Other"
+                                value={customTip}
+                                onChange={(e) => handleCustomTipChange(e.target.value)}
+                                className="w-24 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
+                              />
+                              <span className="text-base font-medium text-gray-600 dark:text-gray-400">%</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        placeholder="0"
-                        value={taxInputValue}
-                        onChange={(e) => handleTaxInputChange(e.target.value)}
-                        className="w-28 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
-                      />
-                      <span className="text-base font-medium text-gray-600 dark:text-gray-400">%</span>
-                    </div>
-                  </div>
 
-                  {/* Tip Percentage */}
-                  <div className="bg-gray-50 dark:bg-gray-700/30 p-4 rounded-xl">
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Tip
-                      </label>
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        ${tipAmount.toFixed(2)}
+                    {/* Stats */}
+                    <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div>
+                          <span className="font-medium">Total Items:</span> {data.menu.items.length}
+                        </div>
+                        <div>
+                          <span className="font-medium">Categories:</span> {categories.length}
+                        </div>
+                        <div className="col-span-2">
+                          <span className="font-medium">Cart ID:</span>{' '}
+                          <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">
+                            {cartId}
+                          </code>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {/* Preset buttons */}
-                      {TIP_PRESETS.map((preset) => (
-                        <button
-                          key={preset}
-                          onClick={() => handleTipPresetClick(preset)}
-                          className={`min-w-[60px] px-4 py-3 text-base font-semibold rounded-xl transition-all ${
-                            tipPercentage === preset && !customTip
-                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
-                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-gray-200 dark:border-gray-600'
-                          }`}
-                        >
-                          {preset}%
-                        </button>
-                      ))}
-
-                      {/* Custom tip input */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          placeholder="Other"
-                          value={customTip}
-                          onChange={(e) => handleCustomTipChange(e.target.value)}
-                          className="w-24 px-4 py-3 text-base font-medium border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
-                        />
-                        <span className="text-base font-medium text-gray-600 dark:text-gray-400">%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
-                  <div>
-                    <span className="font-medium">Total Items:</span> {data.menu.items.length}
-                  </div>
-                  <div>
-                    <span className="font-medium">Categories:</span> {categories.length}
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Cart ID:</span>{' '}
-                    <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded">
-                      {cartId}
-                    </code>
                   </div>
                 </div>
               </div>
