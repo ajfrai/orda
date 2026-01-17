@@ -42,6 +42,19 @@ export interface CartItem {
   created_at: string;
 }
 
+export interface MenuCorrection {
+  id: string;
+  created_at: string;
+  menu_id: string;
+  item_category: string;
+  item_name_original: string;
+  field_corrected: 'name' | 'description' | 'price' | 'category' | 'chips';
+  original_value: string;
+  corrected_value: string;
+  correction_count: number;
+  notes?: string;
+}
+
 // API request/response types
 
 export interface ParseMenuResponse {
