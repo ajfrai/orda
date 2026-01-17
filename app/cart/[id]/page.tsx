@@ -7,7 +7,6 @@ import { TIP_PRESETS } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
 import AddItemModal from '@/app/components/add-item-modal';
 import EditItemModal from '@/app/components/edit-item-modal';
-import EditMenuItemModal from '@/app/components/edit-menu-item-modal';
 import ViewOriginalMenu from '@/app/components/view-original-menu';
 import AuthModal from '@/app/components/AuthModal';
 import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
@@ -43,8 +42,6 @@ export default function CartPage() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
-  const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
-  const [selectedMenuItemForEdit, setSelectedMenuItemForEdit] = useState<MenuItem | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isWhoOwesWhatModalOpen, setIsWhoOwesWhatModalOpen] = useState(false);
@@ -397,124 +394,6 @@ export default function CartPage() {
     } catch (err) {
       console.error('Error deleting cart item:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete item');
-    }
-  };
-
-  // Menu item editing handlers
-  const handleEditMenuItem = (item: MenuItem) => {
-    setSelectedMenuItemForEdit(item);
-    setIsEditMenuItemModalOpen(true);
-  };
-
-  const handleCloseEditMenuItemModal = () => {
-    setIsEditMenuItemModalOpen(false);
-    setSelectedMenuItemForEdit(null);
-  };
-
-  const handleSaveMenuItem = async (originalItem: MenuItem, updatedItem: MenuItem) => {
-    if (!data) return;
-
-    try {
-      // Update the menu items array
-      const updatedItems = data.menu.items.map((item) => {
-        // Match based on name and category to find the exact item
-        if (item.name === originalItem.name && item.category === originalItem.category) {
-          return updatedItem;
-        }
-        return item;
-      });
-
-      // Save updated items to database
-      const response = await fetch(`/api/menu/${data.menu.id}/items`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: updatedItems,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update menu item');
-      }
-
-      // Record corrections for fields that changed
-      const corrections = [];
-
-      if (originalItem.name !== updatedItem.name) {
-        corrections.push({
-          item_category: originalItem.category,
-          item_name_original: originalItem.name,
-          field_corrected: 'name',
-          original_value: originalItem.name,
-          corrected_value: updatedItem.name,
-        });
-      }
-
-      if (originalItem.description !== updatedItem.description) {
-        corrections.push({
-          item_category: originalItem.category,
-          item_name_original: originalItem.name,
-          field_corrected: 'description',
-          original_value: originalItem.description || '',
-          corrected_value: updatedItem.description || '',
-        });
-      }
-
-      if (originalItem.price !== updatedItem.price) {
-        corrections.push({
-          item_category: originalItem.category,
-          item_name_original: originalItem.name,
-          field_corrected: 'price',
-          original_value: originalItem.price.toString(),
-          corrected_value: updatedItem.price.toString(),
-        });
-      }
-
-      if (originalItem.category !== updatedItem.category) {
-        corrections.push({
-          item_category: originalItem.category,
-          item_name_original: originalItem.name,
-          field_corrected: 'category',
-          original_value: originalItem.category,
-          corrected_value: updatedItem.category,
-        });
-      }
-
-      const originalChips = JSON.stringify(originalItem.chips || []);
-      const updatedChips = JSON.stringify(updatedItem.chips || []);
-      if (originalChips !== updatedChips) {
-        corrections.push({
-          item_category: originalItem.category,
-          item_name_original: originalItem.name,
-          field_corrected: 'chips',
-          original_value: originalChips,
-          corrected_value: updatedChips,
-        });
-      }
-
-      // Record all corrections
-      for (const correction of corrections) {
-        await fetch(`/api/menu/${data.menu.id}/corrections`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(correction),
-        });
-      }
-
-      // Refresh cart data to show the updated menu
-      const cartResponse = await fetch(`/api/cart/${cartId}`);
-      if (cartResponse.ok) {
-        const cartData = await cartResponse.json();
-        setData(cartData);
-      }
-    } catch (err) {
-      console.error('Error updating menu item:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update menu item');
     }
   };
 
@@ -1122,7 +1001,6 @@ export default function CartPage() {
                                 item={item}
                                 index={globalStartIndex + idx}
                                 onAddToCart={handleItemClick}
-                                onEdit={handleEditMenuItem}
                               />
                             ))}
                           </div>
@@ -1340,14 +1218,6 @@ export default function CartPage() {
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onUpdate={handleUpdateCartItem}
-      />
-
-      {/* Edit Menu Item Modal */}
-      <EditMenuItemModal
-        item={selectedMenuItemForEdit}
-        isOpen={isEditMenuItemModalOpen}
-        onClose={handleCloseEditMenuItemModal}
-        onSave={handleSaveMenuItem}
       />
 
       {/* Who Owes What Modal */}
