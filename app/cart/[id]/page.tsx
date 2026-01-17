@@ -362,11 +362,6 @@ export default function CartPage() {
   };
 
   const handleDeleteCartItem = async (itemId: string) => {
-    // Confirm deletion
-    if (!confirm('Are you sure you want to remove this item from your order?')) {
-      return;
-    }
-
     try {
       const response = await fetch(`/api/cart/${cartId}/items?itemId=${itemId}`, {
         method: 'DELETE',
@@ -1026,7 +1021,8 @@ export default function CartPage() {
                           {data.cartItems.map((cartItem) => (
                             <div
                               key={cartItem.id}
-                              className="flex justify-between items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg"
+                              onClick={() => handleEditCartItem(cartItem)}
+                              className="flex justify-between items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
                             >
                               <div className="flex-1">
                                 <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -1047,17 +1043,10 @@ export default function CartPage() {
                                   ${(cartItem.item_price * cartItem.quantity).toFixed(2)}
                                 </span>
                                 <button
-                                  onClick={() => handleEditCartItem(cartItem)}
-                                  className="p-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 rounded-lg transition-colors"
-                                  aria-label="Edit item"
-                                  title="Edit item"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteCartItem(cartItem.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCartItem(cartItem.id);
+                                  }}
                                   className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors"
                                   aria-label="Delete item"
                                   title="Delete item"
