@@ -31,6 +31,7 @@ export default function CartPage() {
   const [progressStage, setProgressStage] = useState<ProgressStage>('setup');
   const [streamText, setStreamText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isShareCopied, setIsShareCopied] = useState(false);
   const parseMenuStarted = useRef(false);
 
   // Modal state
@@ -98,6 +99,17 @@ export default function CartPage() {
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleShareCart = async () => {
+    try {
+      const shareUrl = window.location.href.split('?')[0]; // Remove query params
+      await navigator.clipboard.writeText(shareUrl);
+      setIsShareCopied(true);
+      setTimeout(() => setIsShareCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy share link:', err);
     }
   };
 
@@ -657,8 +669,29 @@ export default function CartPage() {
                     </h1>
                   </div>
 
-                  {/* User Menu */}
+                  {/* Share Button and User Menu */}
                   <div className="flex items-center gap-3">
+                    {/* Share Button */}
+                    <button
+                      onClick={handleShareCart}
+                      className="px-4 py-2 bg-white dark:bg-gray-700 border-2 border-indigo-600 dark:border-indigo-400 text-indigo-600 dark:text-indigo-400 rounded-lg font-medium hover:bg-indigo-50 dark:hover:bg-gray-600 transition flex items-center gap-2"
+                    >
+                      {isShareCopied ? (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                          <span>Share</span>
+                        </>
+                      )}
+                    </button>
                     {userName ? (
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-gray-600 dark:text-gray-300">
