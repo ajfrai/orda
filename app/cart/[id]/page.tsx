@@ -11,6 +11,7 @@ import EditMenuItemModal from '@/app/components/edit-menu-item-modal';
 import ViewOriginalMenu from '@/app/components/view-original-menu';
 import AuthModal from '@/app/components/AuthModal';
 import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
+import EditRestaurantModal from '@/app/components/EditRestaurantModal';
 
 interface CartResponse {
   cart: Cart;
@@ -52,6 +53,7 @@ export default function CartPage() {
   const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
   const [selectedMenuItemForEdit, setSelectedMenuItemForEdit] = useState<MenuItem | null>(null);
   const [isViewOriginalMenuOpen, setIsViewOriginalMenuOpen] = useState(false);
+  const [isEditRestaurantModalOpen, setIsEditRestaurantModalOpen] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
@@ -305,6 +307,43 @@ export default function CartPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedItem(null);
+  };
+
+  const handleSaveRestaurantDetails = async (updatedData: {
+    restaurantName: string;
+    city: string;
+    state: string;
+  }) => {
+    if (!data?.menu.id) return;
+
+    try {
+      const response = await fetch(`/api/menu/${data.menu.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          restaurant_name: updatedData.restaurantName,
+          location_city: updatedData.city,
+          location_state: updatedData.state,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update restaurant details');
+      }
+
+      // Refresh cart data to show the updated information
+      const cartResponse = await fetch(`/api/cart/${cartId}`);
+      if (cartResponse.ok) {
+        const cartData = await cartResponse.json();
+        setData(cartData);
+      }
+    } catch (error) {
+      console.error('Error updating restaurant details:', error);
+      throw error;
+    }
   };
 
   const handleAddToCart = async (item: MenuItem, quantity: number, notes: string) => {
@@ -953,9 +992,33 @@ export default function CartPage() {
 
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                      {data.menu.restaurant_name || 'Your Order'}
-                    </h1>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                        {data.menu.restaurant_name || 'Your Order'}
+                      </h1>
+                      <button
+                        onClick={() => setIsEditRestaurantModalOpen(true)}
+                        className="p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition"
+                        title="Edit restaurant details"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                    </div>
+                    {data.menu.location.city === 'Unknown' && data.menu.location.state === 'Unknown' ? (
+                      <button
+                        onClick={() => setIsEditRestaurantModalOpen(true)}
+                        className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm flex items-center gap-1 transition"
+                      >
+                        <span>📍</span>
+                        <span>Add restaurant details...</span>
+                      </button>
+                    ) : (
+                      <p className="text-gray-600 dark:text-gray-300 text-sm">
+                        {data.menu.location.city}, {data.menu.location.state}
+                      </p>
+                    )}
                   </div>
 
                   {/* User Menu */}
@@ -982,11 +1045,6 @@ export default function CartPage() {
                     )}
                   </div>
                 </div>
-                {data.menu.restaurant_name && (
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
-                    {data.menu.location.city}, {data.menu.location.state}
-                  </p>
-                )}
                 {data.menu.pdf_url && (
                   <a
                     href={data.menu.pdf_url}
@@ -1425,6 +1483,20 @@ export default function CartPage() {
         tipPercentage={tipPercentage}
         restaurantName={data?.menu.restaurant_name || 'Your Order'}
       />
+
+      {/* Edit Restaurant Modal */}
+      {data && (
+        <EditRestaurantModal
+          isOpen={isEditRestaurantModalOpen}
+          onClose={() => setIsEditRestaurantModalOpen(false)}
+          onSave={handleSaveRestaurantDetails}
+          currentData={{
+            restaurantName: data.menu.restaurant_name || 'Your Order',
+            city: data.menu.location.city,
+            state: data.menu.location.state,
+          }}
+        />
+      )}
     </div>
   );
 }
