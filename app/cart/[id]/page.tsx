@@ -1319,7 +1319,7 @@ export default function CartPage() {
                           {data.cartItems.map((cartItem) => (
                             <div
                               key={cartItem.id}
-                              className="flex justify-between items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg"
+                              className="flex justify-between items-center gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg"
                             >
                               <div className="flex-1">
                                 <span className="font-medium text-gray-900 dark:text-gray-100">
