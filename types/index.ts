@@ -8,6 +8,9 @@ export interface MenuItem {
   is_estimate: boolean;
   // Flexible dietary/attribute tags as chips
   chips?: string[];
+  // Regional specialty information
+  regional_tag?: string;
+  regional_description?: string;
 }
 
 export interface Menu {

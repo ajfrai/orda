@@ -30,6 +30,8 @@ export interface MenuItem {
   price?: number;
   isEstimate: boolean;
   chips?: string[];
+  regionalTag?: string;
+  regionalDescription?: string;
 }
 
 interface FileData {
