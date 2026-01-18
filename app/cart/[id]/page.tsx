@@ -1102,14 +1102,12 @@ export default function CartPage() {
                   </div>
                 </div>
                 {data.menu.pdf_url && (
-                  <a
-                    href={data.menu.pdf_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                  <button
+                    onClick={() => setIsViewOriginalMenuOpen(true)}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer border-none bg-transparent p-0"
                   >
                     View original menu
-                  </a>
+                  </button>
                 )}
 
                 {/* Tab Navigation */}
