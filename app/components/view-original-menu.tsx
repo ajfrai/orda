@@ -14,13 +14,16 @@ export default function ViewOriginalMenu({ pdfUrl, restaurantName, isOpen: exter
 
   // Use external control if provided, otherwise use internal state
   const isModalOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
-  const setIsModalOpen = onClose !== undefined ? onClose : (() => setInternalIsOpen(false));
 
   // Close on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isModalOpen) {
-        setIsModalOpen(false);
+        if (onClose) {
+          onClose();
+        } else {
+          setInternalIsOpen(false);
+        }
       }
     };
 
@@ -33,18 +36,26 @@ export default function ViewOriginalMenu({ pdfUrl, restaurantName, isOpen: exter
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
-  }, [isModalOpen]);
+  }, [isModalOpen, onClose]);
 
   if (!pdfUrl) return null;
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      setIsModalOpen();
+      if (onClose) {
+        onClose();
+      } else {
+        setInternalIsOpen(false);
+      }
     }
   };
 
   const handleClose = () => {
-    setIsModalOpen();
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(false);
+    }
   };
 
   const isPdf = pdfUrl.toLowerCase().endsWith('.pdf');
