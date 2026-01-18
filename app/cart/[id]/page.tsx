@@ -12,8 +12,9 @@ import ViewOriginalMenu from '@/app/components/view-original-menu';
 import AuthModal from '@/app/components/AuthModal';
 import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
 import EditRestaurantModal from '@/app/components/EditRestaurantModal';
-import SearchFAB from '@/app/components/SearchFAB';
+import ActionBubble from '@/app/components/ActionBubble';
 import SearchPanel from '@/app/components/SearchPanel';
+import ChatPanel from '@/app/components/ChatPanel';
 
 interface CartResponse {
   cart: Cart;
@@ -64,6 +65,12 @@ export default function CartPage() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Chat state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  // Action bubble state
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+
   // Swipe state
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -103,14 +110,20 @@ export default function CartPage() {
     }
   }, [streamingComplete, isStreaming]);
 
-  // Scroll to top when switching tabs and close search
+  // Scroll to top when switching tabs and close search/chat
   useEffect(() => {
     window.scrollTo(0, 0);
     if (isSearchOpen) {
       setIsSearchOpen(false);
       setSearchQuery('');
     }
-  }, [activeTab]);
+    if (isChatOpen) {
+      setIsChatOpen(false);
+    }
+    if (isActionMenuOpen) {
+      setIsActionMenuOpen(false);
+    }
+  }, [activeTab, isSearchOpen, isChatOpen, isActionMenuOpen]);
 
   // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
@@ -967,15 +980,25 @@ export default function CartPage() {
   const filteredCategories = Object.keys(filteredGroupedItems).sort();
 
   // Handlers for search
-  const handleSearchToggle = () => {
-    setIsSearchOpen(!isSearchOpen);
-    if (isSearchOpen) {
-      setSearchQuery(''); // Clear search when closing
-    }
+  const handleSearchOpen = () => {
+    setIsSearchOpen(true);
+    setIsChatOpen(false); // Close chat if open
   };
 
   const handleSearchChange = (query: string) => {
     setSearchQuery(query);
+  };
+
+  // Handlers for chat
+  const handleChatOpen = () => {
+    setIsChatOpen(true);
+    setIsSearchOpen(false); // Close search if open
+    setSearchQuery(''); // Clear search
+  };
+
+  // Handler for action bubble
+  const handleToggleActionMenu = () => {
+    setIsActionMenuOpen(!isActionMenuOpen);
   };
 
   return (
@@ -1547,15 +1570,28 @@ export default function CartPage() {
         />
       )}
 
-      {/* Search FAB - only show on menu tab */}
+      {/* Action Bubble, Search and Chat - only show on menu tab */}
       {data && activeTab === 'menu' && (
         <>
-          <SearchFAB onClick={handleSearchToggle} isActive={isSearchOpen} />
+          <ActionBubble
+            onChatClick={handleChatOpen}
+            onSearchClick={handleSearchOpen}
+            isMenuOpen={isActionMenuOpen}
+            onToggleMenu={handleToggleActionMenu}
+          />
           <SearchPanel
             isOpen={isSearchOpen}
-            onClose={() => setIsSearchOpen(false)}
+            onClose={() => {
+              setIsSearchOpen(false);
+              setSearchQuery('');
+            }}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
+          />
+          <ChatPanel
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            menuId={data.menu.id}
           />
         </>
       )}
