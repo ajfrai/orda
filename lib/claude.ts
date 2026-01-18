@@ -154,15 +154,18 @@ If it IS a restaurant menu, respond with a STREAM of individual JSON objects, on
 First, output the metadata:
 {"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
 
-Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags:
+Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags and regional specialties:
 {"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "chips": ["Spicy"]}
 {"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "chips": ["Vegetarian"]}
+{"type": "item", "category": "Entrees", "name": "Mole Negro", "description": "Traditional Oaxacan black mole", "price": 18.99, "isEstimate": false, "chips": ["Oaxacan"]}
 {"type": "item", "category": "Entrees", "name": "Salad", "description": "Fresh garden salad", "price": 8.99, "isEstimate": false, "chips": ["Vegan", "Gluten Free"]}
 
 Finally, output a completion marker when all menu items are extracted:
 {"status": "complete", "type": "menu_extraction_end"}
 
 CHIPS (include all that apply as strings in the chips array):
+
+DIETARY ATTRIBUTES:
 - "Spicy" - for items marked with chili peppers or described as spicy/hot
 - "Vegetarian" - for items with no meat/fish (but may include dairy/eggs)
 - "Vegan" - for items with no animal products
@@ -172,7 +175,14 @@ CHIPS (include all that apply as strings in the chips array):
 - "Nut Free" - for items without nuts
 - Any other relevant dietary tags you find on the menu
 
-If an item has no special dietary attributes, use an empty array: "chips": []
+REGIONAL SPECIALTIES (IMPORTANT):
+- Identify dishes with strong regional authenticity tied to a specific city, region, or culinary tradition
+- Add the regional identifier as a chip (e.g., "Oaxacan", "Hyderabadi", "Neapolitan", "Sichuan", "Lima Icon")
+- Only tag items prepared in traditional/authentic style, NOT fusion or heavily adapted versions
+- Do NOT use generic marketing terms like "Chef's Special" or "Authentic" - be specific
+- Examples: "Oaxacan" (for mole negro), "Hyderabadi" (for dum biryani), "Lima Icon" (for ceviche), "Sichuan" (for mapo tofu), "Neapolitan" (for margherita pizza)
+
+If an item has no special attributes, use an empty array: "chips": []
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
@@ -408,15 +418,18 @@ If it IS a restaurant menu, respond with a STREAM of individual JSON objects, on
 First, output the metadata:
 {"type": "metadata", "restaurantName": "Name", "location": {"city": "City", "state": "ST"}}
 
-Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags:
+Then, output each menu item as a separate JSON object with a "chips" array for dietary/attribute tags and regional specialties:
 {"type": "item", "category": "Appetizers", "name": "Wings", "description": "Crispy wings", "price": 12.99, "isEstimate": false, "chips": ["Spicy"]}
 {"type": "item", "category": "Appetizers", "name": "Nachos", "description": "Loaded nachos", "price": 10.99, "isEstimate": false, "chips": ["Vegetarian"]}
+{"type": "item", "category": "Entrees", "name": "Mole Negro", "description": "Traditional Oaxacan black mole", "price": 18.99, "isEstimate": false, "chips": ["Oaxacan"]}
 {"type": "item", "category": "Entrees", "name": "Salad", "description": "Fresh garden salad", "price": 8.99, "isEstimate": false, "chips": ["Vegan", "Gluten Free"]}
 
 Finally, output a completion marker when all menu items are extracted:
 {"status": "complete", "type": "menu_extraction_end"}
 
 CHIPS (include all that apply as strings in the chips array):
+
+DIETARY ATTRIBUTES:
 - "Spicy" - for items marked with chili peppers or described as spicy/hot
 - "Vegetarian" - for items with no meat/fish (but may include dairy/eggs)
 - "Vegan" - for items with no animal products
@@ -426,7 +439,14 @@ CHIPS (include all that apply as strings in the chips array):
 - "Nut Free" - for items without nuts
 - Any other relevant dietary tags you find on the menu
 
-If an item has no special dietary attributes, use an empty array: "chips": []
+REGIONAL SPECIALTIES (IMPORTANT):
+- Identify dishes with strong regional authenticity tied to a specific city, region, or culinary tradition
+- Add the regional identifier as a chip (e.g., "Oaxacan", "Hyderabadi", "Neapolitan", "Sichuan", "Lima Icon")
+- Only tag items prepared in traditional/authentic style, NOT fusion or heavily adapted versions
+- Do NOT use generic marketing terms like "Chef's Special" or "Authentic" - be specific
+- Examples: "Oaxacan" (for mole negro), "Hyderabadi" (for dum biryani), "Lima Icon" (for ceviche), "Sichuan" (for mapo tofu), "Neapolitan" (for margherita pizza)
+
+If an item has no special attributes, use an empty array: "chips": []
 
 If prices are missing or unclear, estimate them based on the type of restaurant and dish, and set "isEstimate": true.
 If the city/state is not on the menu, try to infer from restaurant name or other context clues, otherwise omit.
