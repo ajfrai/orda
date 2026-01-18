@@ -43,11 +43,15 @@ export default function CartPage() {
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCartItem, setSelectedCartItem] = useState<CartItem | null>(null);
-  const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
-  const [selectedMenuItemForEdit, setSelectedMenuItemForEdit] = useState<MenuItem | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isWhoOwesWhatModalOpen, setIsWhoOwesWhatModalOpen] = useState(false);
+
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
+  const [selectedMenuItemForEdit, setSelectedMenuItemForEdit] = useState<MenuItem | null>(null);
+  const [isViewOriginalMenuOpen, setIsViewOriginalMenuOpen] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
@@ -400,7 +404,15 @@ export default function CartPage() {
     }
   };
 
-  // Menu item editing handlers
+  // Edit mode handlers
+  const handleEnterEditMode = () => {
+    setIsEditMode(true);
+  };
+
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+  };
+
   const handleEditMenuItem = (item: MenuItem) => {
     setSelectedMenuItemForEdit(item);
     setIsEditMenuItemModalOpen(true);
@@ -1103,6 +1115,24 @@ export default function CartPage() {
                       transform: hasMetDragThreshold && activeTab === 'order' && dragOffset > 0 ? 'scale(0.98)' : 'scale(1)',
                     }}
                   >
+                    {/* Edit Mode Banner */}
+                    {isEditMode && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                            Edit Mode - Click any item to make corrections
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleExitEditMode}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    )}
+
                     {categories.map((category) => {
                       const previousCategories = categories.slice(0, categories.indexOf(category));
                       const globalStartIndex = previousCategories.reduce(
@@ -1123,6 +1153,7 @@ export default function CartPage() {
                                 index={globalStartIndex + idx}
                                 onAddToCart={handleItemClick}
                                 onEdit={handleEditMenuItem}
+                                isEditMode={isEditMode}
                               />
                             ))}
                           </div>
@@ -1130,11 +1161,26 @@ export default function CartPage() {
                       );
                     })}
 
-                    {/* View Original Menu Button */}
-                    <ViewOriginalMenu
-                      pdfUrl={data.menu.pdf_url}
-                      restaurantName={data.menu.restaurant_name}
-                    />
+                    {/* Footer with View Original and Feedback */}
+                    {!isEditMode && (
+                      <div className="mt-8 flex justify-center">
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                          <button
+                            onClick={() => setIsViewOriginalMenuOpen(true)}
+                            className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                          >
+                            View original menu
+                          </button>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <button
+                            onClick={handleEnterEditMode}
+                            className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          >
+                            Spot an error?
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Order Tab Content */}
@@ -1349,6 +1395,16 @@ export default function CartPage() {
         onClose={handleCloseEditMenuItemModal}
         onSave={handleSaveMenuItem}
       />
+
+      {/* View Original Menu Modal */}
+      {data?.menu && (
+        <ViewOriginalMenu
+          pdfUrl={data.menu.pdf_url}
+          restaurantName={data.menu.restaurant_name}
+          isOpen={isViewOriginalMenuOpen}
+          onClose={() => setIsViewOriginalMenuOpen(false)}
+        />
+      )}
 
       {/* Who Owes What Modal */}
       <WhoOwesWhatModal

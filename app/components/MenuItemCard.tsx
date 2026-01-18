@@ -7,9 +7,10 @@ interface MenuItemCardProps {
   index: number;
   onAddToCart?: (item: MenuItem) => void;
   onEdit?: (item: MenuItem) => void;
+  isEditMode?: boolean;
 }
 
-export default function MenuItemCard({ item, index, onAddToCart, onEdit }: MenuItemCardProps) {
+export default function MenuItemCard({ item, index, onAddToCart, onEdit, isEditMode }: MenuItemCardProps) {
   const handleClick = () => {
     if (onAddToCart) {
       onAddToCart(item);
@@ -17,7 +18,7 @@ export default function MenuItemCard({ item, index, onAddToCart, onEdit }: MenuI
   };
 
   const handleEdit = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the card click
+    e.stopPropagation();
     if (onEdit) {
       onEdit(item);
     }
@@ -25,24 +26,28 @@ export default function MenuItemCard({ item, index, onAddToCart, onEdit }: MenuI
 
   return (
     <div
-      className="menu-item-card opacity-0 group"
+      className="menu-item-card opacity-0"
       style={{
         animationDelay: `${index * 50}ms`,
       }}
     >
       <div
-        className="flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 cursor-pointer relative"
+        className={`flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-300 cursor-pointer relative ${
+          isEditMode
+            ? 'border-amber-300 dark:border-amber-600 shadow-md'
+            : 'border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600'
+        }`}
         onClick={handleClick}
       >
-        {/* Edit Button - Always visible on mobile, hover-only on desktop */}
-        {onEdit && (
+        {/* Edit Button - Only visible in edit mode */}
+        {isEditMode && onEdit && (
           <button
             onClick={handleEdit}
-            className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-gray-600 dark:text-gray-400 hover:text-amber-600 dark:hover:text-amber-400 transition-all md:opacity-0 md:group-hover:opacity-100"
+            className="absolute top-2 right-2 p-2 rounded-md bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-400 transition-colors z-10"
             aria-label="Edit menu item"
-            title="Edit menu item"
+            title="Edit this item"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
           </button>
