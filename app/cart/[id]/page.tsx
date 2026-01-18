@@ -1024,17 +1024,12 @@ export default function CartPage() {
                   {/* User Menu */}
                   <div className="flex items-center gap-3">
                     {userName ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                          {userName}
-                        </span>
-                        <button
-                          onClick={handleChangeName}
-                          className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition"
-                        >
-                          Change Name
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleChangeName}
+                        className="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 underline decoration-1 underline-offset-2 transition cursor-pointer border-none bg-transparent p-0"
+                      >
+                        {userName}
+                      </button>
                     ) : (
                       <button
                         onClick={() => setShowAuthModal(true)}

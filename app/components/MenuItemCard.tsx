@@ -34,7 +34,7 @@ export default function MenuItemCard({ item, index, onAddToCart, onEdit, isEditM
       <div
         className={`flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border transition-all duration-300 cursor-pointer relative ${
           isEditMode
-            ? 'border-amber-300 dark:border-amber-600 shadow-md'
+            ? 'border-amber-300 dark:border-amber-600 shadow-md pr-14'
             : 'border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600'
         }`}
         onClick={handleClick}
