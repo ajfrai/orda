@@ -7,6 +7,7 @@ import { TIP_PRESETS } from '@/types';
 import MenuItemCard from '@/app/components/MenuItemCard';
 import AddItemModal from '@/app/components/add-item-modal';
 import EditItemModal from '@/app/components/edit-item-modal';
+import EditMenuItemModal from '@/app/components/edit-menu-item-modal';
 import ViewOriginalMenu from '@/app/components/view-original-menu';
 import AuthModal from '@/app/components/AuthModal';
 import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
@@ -45,6 +46,12 @@ export default function CartPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [isWhoOwesWhatModalOpen, setIsWhoOwesWhatModalOpen] = useState(false);
+
+  // Edit mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMenuItemModalOpen, setIsEditMenuItemModalOpen] = useState(false);
+  const [selectedMenuItemForEdit, setSelectedMenuItemForEdit] = useState<MenuItem | null>(null);
+  const [isViewOriginalMenuOpen, setIsViewOriginalMenuOpen] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
@@ -394,6 +401,132 @@ export default function CartPage() {
     } catch (err) {
       console.error('Error deleting cart item:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete item');
+    }
+  };
+
+  // Edit mode handlers
+  const handleEnterEditMode = () => {
+    setIsEditMode(true);
+  };
+
+  const handleExitEditMode = () => {
+    setIsEditMode(false);
+  };
+
+  const handleEditMenuItem = (item: MenuItem) => {
+    setSelectedMenuItemForEdit(item);
+    setIsEditMenuItemModalOpen(true);
+  };
+
+  const handleCloseEditMenuItemModal = () => {
+    setIsEditMenuItemModalOpen(false);
+    setSelectedMenuItemForEdit(null);
+  };
+
+  const handleSaveMenuItem = async (originalItem: MenuItem, updatedItem: MenuItem) => {
+    if (!data) return;
+
+    try {
+      // Update the menu items array
+      const updatedItems = data.menu.items.map((item) => {
+        // Match based on name and category to find the exact item
+        if (item.name === originalItem.name && item.category === originalItem.category) {
+          return updatedItem;
+        }
+        return item;
+      });
+
+      // Save updated items to database
+      const response = await fetch(`/api/menu/${data.menu.id}/items`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: updatedItems,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update menu item');
+      }
+
+      // Record corrections for fields that changed
+      const corrections = [];
+
+      if (originalItem.name !== updatedItem.name) {
+        corrections.push({
+          item_category: originalItem.category,
+          item_name_original: originalItem.name,
+          field_corrected: 'name',
+          original_value: originalItem.name,
+          corrected_value: updatedItem.name,
+        });
+      }
+
+      if (originalItem.description !== updatedItem.description) {
+        corrections.push({
+          item_category: originalItem.category,
+          item_name_original: originalItem.name,
+          field_corrected: 'description',
+          original_value: originalItem.description || '',
+          corrected_value: updatedItem.description || '',
+        });
+      }
+
+      if (originalItem.price !== updatedItem.price) {
+        corrections.push({
+          item_category: originalItem.category,
+          item_name_original: originalItem.name,
+          field_corrected: 'price',
+          original_value: originalItem.price.toString(),
+          corrected_value: updatedItem.price.toString(),
+        });
+      }
+
+      if (originalItem.category !== updatedItem.category) {
+        corrections.push({
+          item_category: originalItem.category,
+          item_name_original: originalItem.name,
+          field_corrected: 'category',
+          original_value: originalItem.category,
+          corrected_value: updatedItem.category,
+        });
+      }
+
+      const originalChips = JSON.stringify(originalItem.chips || []);
+      const updatedChips = JSON.stringify(updatedItem.chips || []);
+      if (originalChips !== updatedChips) {
+        corrections.push({
+          item_category: originalItem.category,
+          item_name_original: originalItem.name,
+          field_corrected: 'chips',
+          original_value: originalChips,
+          corrected_value: updatedChips,
+        });
+      }
+
+      // Record all corrections
+      for (const correction of corrections) {
+        await fetch(`/api/menu/${data.menu.id}/corrections`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(correction),
+        });
+      }
+
+      // Refresh cart data to show the updated menu
+      const cartResponse = await fetch(`/api/cart/${cartId}`);
+      if (cartResponse.ok) {
+        const cartData = await cartResponse.json();
+        setData(cartData);
+      }
+    } catch (err) {
+      console.error('Error updating menu item:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update menu item');
     }
   };
 
@@ -982,6 +1115,24 @@ export default function CartPage() {
                       transform: hasMetDragThreshold && activeTab === 'order' && dragOffset > 0 ? 'scale(0.98)' : 'scale(1)',
                     }}
                   >
+                    {/* Edit Mode Banner */}
+                    {isEditMode && (
+                      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                            Edit Mode - Click any item to make corrections
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleExitEditMode}
+                          className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    )}
+
                     {categories.map((category) => {
                       const previousCategories = categories.slice(0, categories.indexOf(category));
                       const globalStartIndex = previousCategories.reduce(
@@ -1001,6 +1152,8 @@ export default function CartPage() {
                                 item={item}
                                 index={globalStartIndex + idx}
                                 onAddToCart={handleItemClick}
+                                onEdit={handleEditMenuItem}
+                                isEditMode={isEditMode}
                               />
                             ))}
                           </div>
@@ -1008,11 +1161,26 @@ export default function CartPage() {
                       );
                     })}
 
-                    {/* View Original Menu Button */}
-                    <ViewOriginalMenu
-                      pdfUrl={data.menu.pdf_url}
-                      restaurantName={data.menu.restaurant_name}
-                    />
+                    {/* Footer with View Original and Feedback */}
+                    {!isEditMode && (
+                      <div className="mt-8 flex justify-center">
+                        <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                          <button
+                            onClick={() => setIsViewOriginalMenuOpen(true)}
+                            className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                          >
+                            View original menu
+                          </button>
+                          <span className="text-gray-300 dark:text-gray-600">•</span>
+                          <button
+                            onClick={handleEnterEditMode}
+                            className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+                          >
+                            Spot an error?
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Order Tab Content */}
@@ -1219,6 +1387,24 @@ export default function CartPage() {
         onClose={handleCloseEditModal}
         onUpdate={handleUpdateCartItem}
       />
+
+      {/* Edit Menu Item Modal */}
+      <EditMenuItemModal
+        item={selectedMenuItemForEdit}
+        isOpen={isEditMenuItemModalOpen}
+        onClose={handleCloseEditMenuItemModal}
+        onSave={handleSaveMenuItem}
+      />
+
+      {/* View Original Menu Modal */}
+      {data?.menu && (
+        <ViewOriginalMenu
+          pdfUrl={data.menu.pdf_url}
+          restaurantName={data.menu.restaurant_name}
+          isOpen={isViewOriginalMenuOpen}
+          onClose={() => setIsViewOriginalMenuOpen(false)}
+        />
+      )}
 
       {/* Who Owes What Modal */}
       <WhoOwesWhatModal
