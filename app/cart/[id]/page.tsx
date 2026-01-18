@@ -123,7 +123,7 @@ export default function CartPage() {
     if (isActionMenuOpen) {
       setIsActionMenuOpen(false);
     }
-  }, [activeTab, isSearchOpen, isChatOpen, isActionMenuOpen]);
+  }, [activeTab, isSearchOpen, isChatOpen]);
 
   // Load user name from localStorage on mount and show modal if not set
   useEffect(() => {
