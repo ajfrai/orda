@@ -6,7 +6,7 @@ export interface MenuItem {
   description?: string;
   price: number;
   is_estimate: boolean;
-  // Flexible dietary/attribute tags as chips
+  // Flexible dietary/attribute tags as chips (includes regional specialties like "Oaxacan", "Hyderabadi")
   chips?: string[];
 }
 

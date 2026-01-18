@@ -61,14 +61,24 @@ export default function MenuItemCard({ item, index, onAddToCart, onEdit, isEditM
           {/* Dietary/Attribute Chips */}
           {item.chips && item.chips.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              {item.chips.map((chip, chipIndex) => (
-                <span
-                  key={chipIndex}
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300"
-                >
-                  {chip}
-                </span>
-              ))}
+              {item.chips.map((chip, chipIndex) => {
+                // Identify regional chips (proper nouns, not common dietary tags)
+                const dietaryTags = ['Spicy', 'Vegetarian', 'Vegan', 'Gluten Free', 'Kosher', 'Dairy Free', 'Nut Free', 'Halal'];
+                const isRegionalChip = !dietaryTags.includes(chip);
+
+                return (
+                  <span
+                    key={chipIndex}
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      isRegionalChip
+                        ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800/40'
+                        : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300'
+                    }`}
+                  >
+                    {chip}
+                  </span>
+                );
+              })}
             </div>
           )}
 
