@@ -85,6 +85,16 @@ export default function CartPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Clean up URL when streaming completes
+  useEffect(() => {
+    if (streamingComplete && isStreaming) {
+      // Remove streaming parameter from URL without triggering a navigation
+      const url = new URL(window.location.href);
+      url.searchParams.delete('streaming');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [streamingComplete, isStreaming]);
+
   // Scroll to top when switching tabs
   useEffect(() => {
     window.scrollTo(0, 0);
