@@ -14,6 +14,44 @@ interface FileData {
   isDocument: boolean;
 }
 
+/**
+ * Upload file to Supabase Storage and return public URL
+ */
+async function uploadFileToStorage(buffer: Buffer, fileName: string, mimeType: string): Promise<string | null> {
+  try {
+    const supabase = getServiceRoleClient();
+
+    // Generate unique filename with timestamp
+    const timestamp = Date.now();
+    const extension = fileName.split('.').pop() || 'pdf';
+    const uniqueFileName = `${timestamp}-${Math.random().toString(36).substring(7)}.${extension}`;
+
+    // Upload to storage
+    const { data, error } = await supabase.storage
+      .from('menu-uploads')
+      .upload(uniqueFileName, buffer, {
+        contentType: mimeType,
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading file to storage:', error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('menu-uploads')
+      .getPublicUrl(data.path);
+
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Exception during file upload:', error);
+    return null;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || '';
@@ -56,6 +94,10 @@ export async function POST(request: NextRequest) {
     // Convert to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Upload file to storage
+    console.log('Uploading file to storage:', file.name, file.type);
+    const pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
 
     console.log('Analyzing uploaded file:', file.name, file.type);
     const analysis = await analyzeMenuFromUpload(buffer, file.type);
@@ -106,7 +148,7 @@ export async function POST(request: NextRequest) {
     const { data: menu, error: menuError } = await supabase
       .from('menus')
       .insert({
-        pdf_url: null,
+        pdf_url: pdfUrl,
         restaurant_name: analysis.restaurantName,
         location_city: analysis.location?.city || null,
         location_state: analysis.location?.state || null,
@@ -238,6 +280,10 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
+        // Upload file to storage
+        sendEvent('status', { message: 'Uploading menu file...' });
+        const pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
+
         fileData = {
           base64: buffer.toString('base64'),
           mediaType: file.type,
@@ -291,7 +337,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
                 const { data: menu, error: menuError } = await supabase
                   .from('menus')
                   .insert({
-                    pdf_url: null,
+                    pdf_url: pdfUrl,
                     restaurant_name: metadata.restaurantName,
                     location_city: metadata.location?.city || null,
                     location_state: metadata.location?.state || null,
@@ -440,7 +486,7 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           const { data: menu, error: menuError } = await supabase
             .from('menus')
             .insert({
-              pdf_url: null,
+              pdf_url: pdfUrl,
               restaurant_name: result.restaurantName,
               location_city: result.location?.city || null,
               location_state: result.location?.state || null,
