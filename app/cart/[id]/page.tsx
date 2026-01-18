@@ -12,6 +12,8 @@ import ViewOriginalMenu from '@/app/components/view-original-menu';
 import AuthModal from '@/app/components/AuthModal';
 import WhoOwesWhatModal from '@/app/components/who-owes-what-modal';
 import EditRestaurantModal from '@/app/components/EditRestaurantModal';
+import SearchFAB from '@/app/components/SearchFAB';
+import SearchPanel from '@/app/components/SearchPanel';
 
 interface CartResponse {
   cart: Cart;
@@ -58,6 +60,10 @@ export default function CartPage() {
   // Tab state
   const [activeTab, setActiveTab] = useState<'menu' | 'order'>('menu');
 
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Swipe state
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -97,9 +103,13 @@ export default function CartPage() {
     }
   }, [streamingComplete, isStreaming]);
 
-  // Scroll to top when switching tabs
+  // Scroll to top when switching tabs and close search
   useEffect(() => {
     window.scrollTo(0, 0);
+    if (isSearchOpen) {
+      setIsSearchOpen(false);
+      setSearchQuery('');
+    }
   }, [activeTab]);
 
   // Load user name from localStorage on mount and show modal if not set
@@ -933,6 +943,41 @@ export default function CartPage() {
   const taxAmount = subtotal * taxRate;
   const tipAmount = subtotal * (tipPercentage / 100);
 
+  // Search filter function
+  const matchesSearch = (item: MenuItem): boolean => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const name = item.name.toLowerCase();
+    const description = item.description?.toLowerCase() || '';
+    const category = item.category.toLowerCase();
+
+    return name.includes(query) || description.includes(query) || category.includes(query);
+  };
+
+  // Filter menu items based on search
+  const filteredGroupedItems = groupedItems ? Object.keys(groupedItems).reduce((acc, category) => {
+    const filteredItems = groupedItems[category].filter(matchesSearch);
+    if (filteredItems.length > 0) {
+      acc[category] = filteredItems;
+    }
+    return acc;
+  }, {} as Record<string, MenuItem[]>) : {};
+
+  const filteredCategories = Object.keys(filteredGroupedItems).sort();
+
+  // Handlers for search
+  const handleSearchToggle = () => {
+    setIsSearchOpen(!isSearchOpen);
+    if (isSearchOpen) {
+      setSearchQuery(''); // Clear search when closing
+    }
+  };
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 p-6">
       <AuthModal
@@ -1196,10 +1241,19 @@ export default function CartPage() {
                       </div>
                     )}
 
-                    {categories.map((category) => {
-                      const previousCategories = categories.slice(0, categories.indexOf(category));
+                    {/* Show search results message */}
+                    {searchQuery && filteredCategories.length === 0 && (
+                      <div className="text-center py-12">
+                        <p className="text-gray-500 dark:text-gray-400">
+                          No items found for "{searchQuery}"
+                        </p>
+                      </div>
+                    )}
+
+                    {filteredCategories.map((category) => {
+                      const previousCategories = filteredCategories.slice(0, filteredCategories.indexOf(category));
                       const globalStartIndex = previousCategories.reduce(
-                        (sum, cat) => sum + groupedItems![cat].length,
+                        (sum, cat) => sum + filteredGroupedItems![cat].length,
                         0
                       );
 
@@ -1209,7 +1263,7 @@ export default function CartPage() {
                             {category}
                           </h2>
                           <div className="space-y-3">
-                            {groupedItems![category].map((item, idx) => (
+                            {filteredGroupedItems![category].map((item, idx) => (
                               <MenuItemCard
                                 key={`${item.name}-${idx}`}
                                 item={item}
@@ -1491,6 +1545,19 @@ export default function CartPage() {
             state: data.menu.location.state,
           }}
         />
+      )}
+
+      {/* Search FAB - only show on menu tab */}
+      {data && activeTab === 'menu' && (
+        <>
+          <SearchFAB onClick={handleSearchToggle} isActive={isSearchOpen} />
+          <SearchPanel
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+          />
+        </>
       )}
     </div>
   );
