@@ -30,15 +30,15 @@ export default function SearchPanel({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close search"
       />
 
-      {/* Full-screen modal */}
-      <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      {/* Full-screen modal - uses dvh (dynamic viewport height) for mobile keyboard handling */}
+      <div className="fixed inset-x-0 top-0 bottom-0 z-[70] flex flex-col bg-white dark:bg-gray-900 max-h-[100dvh]">
+        {/* Header - Compact on mobile */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm shrink-0">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -48,13 +48,13 @@ export default function SearchPanel({
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
               Search Menu
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
             aria-label="Close search"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,8 +63,8 @@ export default function SearchPanel({
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="p-4 bg-white dark:bg-gray-800">
+        {/* Search Input - Fixed at top with safe area */}
+        <div className="px-4 pt-3 pb-2 bg-white dark:bg-gray-800 shrink-0">
           <div className="relative">
             <input
               ref={inputRef}
@@ -72,10 +72,10 @@ export default function SearchPanel({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search items, descriptions..."
-              className="w-full px-4 py-3 pl-12 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent"
+              className="w-full px-4 py-2.5 pl-12 pr-12 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent text-base"
             />
             <svg
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -101,22 +101,22 @@ export default function SearchPanel({
           </div>
 
           {/* Help Text */}
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
             Searches item names, descriptions, categories, and ingredients
           </p>
         </div>
 
-        {/* Content area (can show search results here in the future) */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
+        {/* Content area - Scrollable and adapts to keyboard */}
+        <div className="flex-1 overflow-y-auto px-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 min-h-0">
           {searchQuery ? (
-            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
+            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
               <p>Filtering menu items as you type...</p>
               <p className="text-xs mt-2">Results will appear in the menu below</p>
             </div>
           ) : (
-            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
+            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
               <p>Start typing to search the menu</p>
-              <div className="text-left space-y-2 text-xs max-w-sm mx-auto mt-4">
+              <div className="text-left space-y-1.5 text-xs max-w-sm mx-auto mt-3">
                 <p className="font-medium text-gray-600 dark:text-gray-300">Search for:</p>
                 <p>• Item names (e.g., "lamb", "pizza")</p>
                 <p>• Descriptions and ingredients</p>

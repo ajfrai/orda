@@ -99,15 +99,15 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close chat"
       />
 
-      {/* Full-screen modal */}
-      <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+      {/* Full-screen modal - uses dvh (dynamic viewport height) for mobile keyboard handling */}
+      <div className="fixed inset-x-0 top-0 bottom-0 z-[70] flex flex-col bg-white dark:bg-gray-900 max-h-[100dvh]">
+        {/* Header - Shrinks to minimal on mobile when keyboard is up */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm shrink-0">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -117,13 +117,13 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
               />
             </svg>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg">
               Ask about the menu
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
             aria-label="Close chat"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,12 +132,12 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           </button>
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Messages - Scrollable area that adapts to available space */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           {messages.length === 0 && (
-            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
-              <p className="mb-4">Ask me anything about the menu!</p>
-              <div className="text-left space-y-2 text-xs max-w-sm mx-auto">
+            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
+              <p className="mb-3">Ask me anything about the menu!</p>
+              <div className="text-left space-y-1.5 text-xs max-w-sm mx-auto">
                 <p className="font-medium text-gray-600 dark:text-gray-300">Try asking:</p>
                 <p>"What's the spiciest dish?"</p>
                 <p>"I'm vegetarian, what do you recommend?"</p>
@@ -178,8 +178,8 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input - Fixed at bottom */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        {/* Input - Stays at bottom, adapts to keyboard with safe-area */}
+        <div className="px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
           <div className="flex gap-2">
             <input
               ref={inputRef}
@@ -189,12 +189,12 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask a question..."
               disabled={isLoading}
-              className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-base"
             />
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
-              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0"
               aria-label="Send message"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
