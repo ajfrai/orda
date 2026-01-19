@@ -1,15 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (name: string) => void;
+  currentName?: string;
 }
 
-export default function AuthModal({ isOpen, onClose, onSubmit }: AuthModalProps) {
-  const [name, setName] = useState('');
+export default function AuthModal({ isOpen, onClose, onSubmit, currentName }: AuthModalProps) {
+  const [name, setName] = useState(currentName || '');
+
+  // Update name when currentName changes (e.g., when modal opens with existing name)
+  useEffect(() => {
+    setName(currentName || '');
+  }, [currentName]);
 
   if (!isOpen) return null;
 
@@ -45,12 +51,24 @@ export default function AuthModal({ isOpen, onClose, onSubmit }: AuthModalProps)
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
-          >
-            Continue
-          </button>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setName('');
+                onClose();
+              }}
+              className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
+            >
+              Continue
+            </button>
+          </div>
         </form>
       </div>
     </div>
