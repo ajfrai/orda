@@ -188,8 +188,7 @@ export default function CartPage() {
   };
 
   const handleChangeName = () => {
-    setUserName(null);
-    localStorage.removeItem('orda_user_name');
+    // Don't clear the name - just open modal for editing
     setShowAuthModal(true);
   };
 
@@ -1007,6 +1006,7 @@ export default function CartPage() {
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSubmit={handleNameSubmit}
+        currentName={userName || undefined}
       />
 
       <div className="max-w-6xl mx-auto">
@@ -1058,12 +1058,19 @@ export default function CartPage() {
                   )}
                 </button>
 
-                <div className="flex justify-between items-start mb-4">
-                  <div>
+                <div className="flex justify-between items-start gap-4 mb-4">
+                  <div className="flex-1 min-w-0">
                     <button
                       onClick={() => setIsEditRestaurantModalOpen(true)}
-                      className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent underline decoration-1 underline-offset-4 hover:from-indigo-700 hover:to-purple-700 transition cursor-pointer border-none p-0 text-left"
+                      className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent underline decoration-1 underline-offset-4 hover:from-indigo-700 hover:to-purple-700 transition cursor-pointer border-none p-0 text-left w-full line-clamp-2 break-words"
                       title="Click to edit restaurant name"
+                      style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        wordBreak: 'break-word'
+                      }}
                     >
                       {data.menu.restaurant_name || 'Your Order'}
                     </button>
@@ -1087,9 +1094,17 @@ export default function CartPage() {
                     {userName ? (
                       <button
                         onClick={handleChangeName}
-                        className="text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 underline decoration-1 underline-offset-2 transition cursor-pointer border-none bg-transparent p-0"
+                        className="flex items-center gap-2 group transition cursor-pointer border-none bg-transparent p-0"
+                        title={`Signed in as ${userName}`}
                       >
-                        {userName}
+                        {/* Avatar with initials */}
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md group-hover:scale-110 transition-transform">
+                          {userName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        {/* Name on hover - desktop only */}
+                        <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">
+                          {userName}
+                        </span>
                       </button>
                     ) : (
                       <button
