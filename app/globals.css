@@ -40,3 +40,8 @@ body {
 .menu-item-card {
   animation: streamIn 0.5s ease-out forwards;
 }
+
+/* Touch optimization for mobile responsiveness */
+.touch-manipulation {
+  touch-action: manipulation;
+}
