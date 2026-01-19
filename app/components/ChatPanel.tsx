@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -144,7 +145,13 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                {msg.role === 'assistant' ? (
+                  <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                )}
               </div>
             </div>
           ))}
