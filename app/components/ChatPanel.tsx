@@ -96,10 +96,18 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 right-6 z-40 w-[320px] max-w-[calc(100vw-3rem)] h-[500px] max-h-[calc(100vh-8rem)]">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col h-full">
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="Close chat"
+      />
+
+      {/* Full-screen modal */}
+      <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-900">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
           <div className="flex items-center gap-2">
             <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -115,10 +123,10 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
             aria-label="Close chat"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -129,7 +137,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           {messages.length === 0 && (
             <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-8">
               <p className="mb-4">Ask me anything about the menu!</p>
-              <div className="text-left space-y-2 text-xs">
+              <div className="text-left space-y-2 text-xs max-w-sm mx-auto">
                 <p className="font-medium text-gray-600 dark:text-gray-300">Try asking:</p>
                 <p>"What's the spiciest dish?"</p>
                 <p>"I'm vegetarian, what do you recommend?"</p>
@@ -144,7 +152,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
@@ -157,7 +165,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-2">
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-3">
                 <div className="flex gap-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
@@ -170,8 +178,8 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+        {/* Input - Fixed at bottom */}
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <div className="flex gap-2">
             <input
               ref={inputRef}
@@ -181,12 +189,12 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
               onKeyPress={handleKeyPress}
               placeholder="Ask a question..."
               disabled={isLoading}
-              className="flex-1 px-4 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim() || isLoading}
-              className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               aria-label="Send message"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,6 +204,6 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
