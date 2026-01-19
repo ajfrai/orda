@@ -1075,7 +1075,7 @@ export default function CartPage() {
                     >
                       {data.menu.restaurant_name || '[Name]'}
                     </button>
-                    {data.menu.location.city === 'Unknown' && data.menu.location.state === 'Unknown' ? (
+                    {!data.menu.location.city || !data.menu.location.state || (data.menu.location.city === 'Unknown' && data.menu.location.state === 'Unknown') ? (
                       <button
                         onClick={() => setIsEditRestaurantModalOpen(true)}
                         className="text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm flex items-center gap-1 transition"
