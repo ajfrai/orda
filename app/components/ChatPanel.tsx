@@ -19,6 +19,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const emptyStateRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -93,6 +94,20 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
     }
   };
 
+  // Handle input focus to ensure content is visible when keyboard appears
+  const handleInputFocus = () => {
+    // On mobile, when keyboard appears, scroll empty state into view
+    // Use setTimeout to allow keyboard to appear first
+    setTimeout(() => {
+      if (messages.length === 0 && emptyStateRef.current) {
+        emptyStateRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    }, 300); // Delay to account for keyboard animation
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -135,7 +150,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
         {/* Messages - Scrollable area that adapts to available space */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           {messages.length === 0 && (
-            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
+            <div ref={emptyStateRef} className="text-center text-gray-500 dark:text-gray-400 text-sm py-4">
               <p className="mb-3">Ask me anything about the menu!</p>
               <div className="text-left space-y-1.5 text-xs max-w-sm mx-auto">
                 <p className="font-medium text-gray-600 dark:text-gray-300">Try asking:</p>
@@ -187,6 +202,7 @@ export default function ChatPanel({ isOpen, onClose, menuId }: ChatPanelProps) {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
+              onFocus={handleInputFocus}
               placeholder="Ask a question..."
               disabled={isLoading}
               className="flex-1 px-4 py-2.5 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed text-base"
