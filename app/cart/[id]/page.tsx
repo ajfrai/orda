@@ -1593,6 +1593,9 @@ export default function CartPage() {
             }}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
+            filteredGroupedItems={filteredGroupedItems}
+            filteredCategories={filteredCategories}
+            onItemClick={handleItemClick}
           />
           <ChatPanel
             isOpen={isChatOpen}

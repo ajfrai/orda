@@ -1,12 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { MenuItem } from '@/types';
 
 interface SearchPanelProps {
   isOpen: boolean;
   onClose: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  filteredGroupedItems: Record<string, MenuItem[]>;
+  filteredCategories: string[];
+  onItemClick: (item: MenuItem) => void;
 }
 
 export default function SearchPanel({
@@ -14,6 +18,9 @@ export default function SearchPanel({
   onClose,
   searchQuery,
   onSearchChange,
+  filteredGroupedItems,
+  filteredCategories,
+  onItemClick,
 }: SearchPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -108,20 +115,79 @@ export default function SearchPanel({
 
         {/* Content area - Scrollable and adapts to keyboard */}
         <div className="flex-1 overflow-y-auto px-4 pb-[max(16px,env(safe-area-inset-bottom))] bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 min-h-0">
-          {searchQuery ? (
+          {filteredCategories.length === 0 ? (
             <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
-              <p>Filtering menu items as you type...</p>
-              <p className="text-xs mt-2">Results will appear in the menu below</p>
+              {searchQuery ? (
+                <>
+                  <p>No items found for "{searchQuery}"</p>
+                  <p className="text-xs mt-2">Try a different search term</p>
+                </>
+              ) : (
+                <>
+                  <p>Start typing to search the menu</p>
+                  <div className="text-left space-y-1.5 text-xs max-w-sm mx-auto mt-3">
+                    <p className="font-medium text-gray-600 dark:text-gray-300">Search for:</p>
+                    <p>• Item names (e.g., "lamb", "pizza")</p>
+                    <p>• Descriptions and ingredients</p>
+                    <p>• Categories (e.g., "appetizer", "vegan")</p>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
-            <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-6">
-              <p>Start typing to search the menu</p>
-              <div className="text-left space-y-1.5 text-xs max-w-sm mx-auto mt-3">
-                <p className="font-medium text-gray-600 dark:text-gray-300">Search for:</p>
-                <p>• Item names (e.g., "lamb", "pizza")</p>
-                <p>• Descriptions and ingredients</p>
-                <p>• Categories (e.g., "appetizer", "vegan")</p>
-              </div>
+            <div className="space-y-6 py-4">
+              {filteredCategories.map((category) => (
+                <div key={category}>
+                  <h2 className="text-lg font-bold mb-3 text-gray-800 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">
+                    {category}
+                  </h2>
+                  <div className="space-y-3">
+                    {filteredGroupedItems[category].map((item, idx) => (
+                      <div
+                        key={`${item.name}-${idx}`}
+                        onClick={() => {
+                          onItemClick(item);
+                          onClose();
+                        }}
+                        className="flex justify-between items-start p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600 transition-all duration-300 cursor-pointer"
+                      >
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {item.name}
+                          </h3>
+                          {item.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {item.description}
+                            </p>
+                          )}
+                          {item.chips && item.chips.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {item.chips.map((chip, chipIdx) => (
+                                <span
+                                  key={chipIdx}
+                                  className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
+                                >
+                                  {chip}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-4 text-right">
+                          <span className="font-bold text-lg text-indigo-600 dark:text-indigo-400">
+                            ${item.price.toFixed(2)}
+                          </span>
+                          {item.is_estimate && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              (estimate)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
