@@ -30,13 +30,13 @@ export default function SearchPanel({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm"
         onClick={onClose}
         aria-label="Close search"
       />
 
       {/* Full-screen modal - uses dvh (dynamic viewport height) for mobile keyboard handling */}
-      <div className="fixed inset-x-0 top-0 bottom-0 z-50 flex flex-col bg-white dark:bg-gray-900 max-h-[100dvh]">
+      <div className="fixed inset-x-0 top-0 bottom-0 z-[70] flex flex-col bg-white dark:bg-gray-900 max-h-[100dvh]">
         {/* Header - Compact on mobile */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm shrink-0">
           <div className="flex items-center gap-2">
