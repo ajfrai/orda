@@ -23,7 +23,12 @@ export default function ActionBubble({
               onChatClick();
               onToggleMenu();
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onChatClick();
+              onToggleMenu();
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors touch-manipulation"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -40,7 +45,12 @@ export default function ActionBubble({
               onSearchClick();
               onToggleMenu();
             }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              onSearchClick();
+              onToggleMenu();
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors touch-manipulation"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -58,7 +68,11 @@ export default function ActionBubble({
       {/* Main Action Bubble */}
       <button
         onClick={onToggleMenu}
-        className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 ${
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          onToggleMenu();
+        }}
+        className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 touch-manipulation ${
           isMenuOpen
             ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
             : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'
