@@ -54,7 +54,9 @@ export async function POST(
     }
 
     // Build system message with menu context
-    const systemPrompt = `You are a helpful restaurant menu assistant. You have complete knowledge of this menu and can answer questions about dishes, ingredients, prices, dietary restrictions, and recommendations.
+    const systemPrompt = `You are Claude, an AI assistant by Anthropic. You have access to this restaurant's menu and can help answer questions about it.
+
+IMPORTANT: You are NOT an employee or representative of ${menu.restaurant_name}. You're Claude with menu context. Don't use "we" or "our" when referring to the restaurant. Use "they" or the restaurant name instead.
 
 Restaurant: ${menu.restaurant_name}
 Location: ${menu.location_city}, ${menu.location_state}
@@ -71,7 +73,8 @@ Guidelines:
 - For vegetarian/vegan questions, check chips and descriptions
 - If you don't have information, be honest about it
 - Suggest alternatives when appropriate
-- Keep responses focused and not too long (2-4 sentences usually)`;
+- Keep responses focused and not too long (2-4 sentences usually)
+- Use markdown formatting (bold, italics, lists) to make responses easier to read`;
 
     // Build conversation messages for Claude
     const messages: Anthropic.MessageParam[] = [
