@@ -963,8 +963,9 @@ export default function CartPage() {
     const name = item.name.toLowerCase();
     const description = item.description?.toLowerCase() || '';
     const category = item.category.toLowerCase();
+    const chips = item.chips?.map(chip => chip.toLowerCase()).join(' ') || '';
 
-    return name.includes(query) || description.includes(query) || category.includes(query);
+    return name.includes(query) || description.includes(query) || category.includes(query) || chips.includes(query);
   };
 
   // Filter menu items based on search
