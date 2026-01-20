@@ -258,6 +258,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
         const appendToExisting = formData.get('appendToExisting') === 'true';
         const existingMenuId = formData.get('menuId') as string | null;
 
+        console.log(`[DEBUG] API received ${files.length} files`);
+        files.forEach((f, i) => console.log(`[DEBUG] File ${i}: ${f.name} (${f.type}, ${f.size} bytes)`));
+
         if (!files || files.length === 0) {
           sendEvent('error', { error: 'No file provided' });
           controller.close();
@@ -288,9 +291,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           }
         }
 
-        // Convert all files to FileData array
+        // Convert all files to FileData array and upload all to storage
         const filesData: FileData[] = [];
-        let pdfUrl: string | null = null;
+        const uploadedUrls: string[] = [];
 
         sendEvent('status', { message: `Uploading ${files.length} menu ${files.length === 1 ? 'file' : 'files'}...` });
 
@@ -299,9 +302,10 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
 
-          // Upload first file to storage (for "view original" feature)
-          if (i === 0) {
-            pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
+          // Upload all files to storage (for "view original" feature)
+          const url = await uploadFileToStorage(buffer, file.name, file.type);
+          if (url) {
+            uploadedUrls.push(url);
           }
 
           filesData.push({
@@ -310,6 +314,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
             isDocument: file.type === 'application/pdf',
           });
         }
+
+        // Store as JSON array if multiple files, single URL string if one file
+        const pdfUrl = uploadedUrls.length === 1 ? uploadedUrls[0] : JSON.stringify(uploadedUrls);
 
         // Use single fileData for backwards compatibility, or array for multiple
         const fileDataForAnalysis = filesData.length === 1 ? filesData[0] : filesData;
