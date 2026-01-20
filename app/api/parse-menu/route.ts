@@ -304,7 +304,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
 
           // Upload all files to storage (for "view original" feature)
           const url = await uploadFileToStorage(buffer, file.name, file.type);
-          uploadedUrls.push(url);
+          if (url) {
+            uploadedUrls.push(url);
+          }
 
           filesData.push({
             base64: buffer.toString('base64'),
