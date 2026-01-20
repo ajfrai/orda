@@ -377,43 +377,53 @@ function parseStreamingJsonLine(line: string): any | null {
 
 /**
  * Streaming version - analyze menu with progress updates
- * @param fileData - File data to analyze
+ * Supports multiple files (pages) in a single request
+ * @param fileData - Single file data or array of file data to analyze
  * @param onProgress - Callback for progress updates
  * @returns Menu analysis result
  */
 export async function analyzeMenuWithProgress(
-  fileData: FileData,
+  fileData: FileData | FileData[],
   onProgress: (event: ProgressEvent) => void
 ): Promise<MenuAnalysisResult> {
   try {
-    onProgress({ type: 'status', message: 'Preparing menu analysis...' });
+    const filesArray = Array.isArray(fileData) ? fileData : [fileData];
+    const pageCount = filesArray.length;
 
-    // Build content array
-    const contentArray: any[] = fileData.isDocument
-      ? [
-          {
-            type: 'document',
-            source: {
-              type: 'base64',
-              media_type: fileData.mediaType,
-              data: fileData.base64,
-            },
+    onProgress({ type: 'status', message: `Preparing menu analysis (${pageCount} ${pageCount === 1 ? 'page' : 'pages'})...` });
+
+    // Build content array with all files
+    const contentArray: any[] = [];
+
+    filesArray.forEach((file, index) => {
+      if (file.isDocument) {
+        contentArray.push({
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: file.mediaType,
+            data: file.base64,
           },
-        ]
-      : [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: fileData.mediaType,
-              data: fileData.base64,
-            },
+        });
+      } else {
+        contentArray.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: file.mediaType,
+            data: file.base64,
           },
-        ];
+        });
+      }
+    });
+
+    const fileDescription = pageCount === 1
+      ? (filesArray[0].isDocument ? 'PDF' : 'image')
+      : `${pageCount} menu pages/images`;
 
     contentArray.push({
       type: 'text',
-      text: `Please analyze this ${fileData.isDocument ? 'PDF' : 'image'} and determine if it's a restaurant menu.
+      text: `Please analyze this ${fileDescription} and determine if it's a restaurant menu.${pageCount > 1 ? ' These are multiple pages from the same menu - combine all items into a unified menu, merging duplicate categories.' : ''}
 
 If it IS a restaurant menu, respond with a STREAM of individual JSON objects, one per line:
 
