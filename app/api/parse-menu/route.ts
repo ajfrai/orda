@@ -251,44 +251,68 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           controller.enqueue(encoder.encode(message));
         };
 
-        // Handle file upload
+        // Handle file upload - supports single file or multiple files
         const formData = await request.formData();
-        const file = formData.get('file') as File;
+        const files = formData.getAll('file') as File[];
         existingCartId = formData.get('cartId') as string | null;
+        const appendToExisting = formData.get('appendToExisting') === 'true';
+        const existingMenuId = formData.get('menuId') as string | null;
 
-        if (!file) {
+        if (!files || files.length === 0) {
           sendEvent('error', { error: 'No file provided' });
           controller.close();
           return;
         }
 
-        // Validate file
+        // Validate all files
         const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        if (!validTypes.includes(file.type)) {
-          sendEvent('error', { error: 'Invalid file type. Please upload a PDF or image file.' });
+        const maxFiles = 6;
+
+        if (files.length > maxFiles) {
+          sendEvent('error', { error: `Too many files. Maximum ${maxFiles} pages allowed.` });
           controller.close();
           return;
         }
 
-        if (file.size > 10 * 1024 * 1024) {
-          sendEvent('error', { error: 'File is too large. Maximum size is 10MB.' });
-          controller.close();
-          return;
+        for (const file of files) {
+          if (!validTypes.includes(file.type)) {
+            sendEvent('error', { error: `Invalid file type: ${file.name}. Please upload PDF or image files.` });
+            controller.close();
+            return;
+          }
+
+          if (file.size > 10 * 1024 * 1024) {
+            sendEvent('error', { error: `File too large: ${file.name}. Maximum size is 10MB per file.` });
+            controller.close();
+            return;
+          }
         }
 
-        // Convert to FileData
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        // Convert all files to FileData array
+        const filesData: FileData[] = [];
+        let pdfUrl: string | null = null;
 
-        // Upload file to storage
-        sendEvent('status', { message: 'Uploading menu file...' });
-        const pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
+        sendEvent('status', { message: `Uploading ${files.length} menu ${files.length === 1 ? 'file' : 'files'}...` });
 
-        fileData = {
-          base64: buffer.toString('base64'),
-          mediaType: file.type,
-          isDocument: file.type === 'application/pdf',
-        };
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          // Upload first file to storage (for "view original" feature)
+          if (i === 0) {
+            pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
+          }
+
+          filesData.push({
+            base64: buffer.toString('base64'),
+            mediaType: file.type,
+            isDocument: file.type === 'application/pdf',
+          });
+        }
+
+        // Use single fileData for backwards compatibility, or array for multiple
+        const fileDataForAnalysis = filesData.length === 1 ? filesData[0] : filesData;
 
         // Track state for incremental menu creation
         let cartId: string | null = null;
@@ -297,8 +321,31 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
         const receivedItems: Array<any> = [];
         const supabase = getServiceRoleClient();
 
+        // If appending to existing menu, fetch current items
+        let existingItems: Array<any> = [];
+        if (appendToExisting && existingMenuId) {
+          const { data: existingMenu, error: fetchError } = await supabase
+            .from('menus')
+            .select('items')
+            .eq('id', existingMenuId)
+            .single();
+
+          if (fetchError) {
+            console.error('Error fetching existing menu:', fetchError);
+            sendEvent('error', { error: 'Failed to fetch existing menu' });
+            controller.close();
+            return;
+          }
+
+          existingItems = existingMenu.items || [];
+          menuId = existingMenuId;
+          cartId = existingCartId;
+
+          sendEvent('status', { message: `Adding to existing menu (${existingItems.length} items)...` });
+        }
+
         // Analyze menu with progress updates
-        const result = await analyzeMenuWithProgress(fileData, async (event: ProgressEvent) => {
+        const result = await analyzeMenuWithProgress(fileDataForAnalysis, async (event: ProgressEvent) => {
           if (event.type === 'status') {
             sendEvent('status', { message: event.message });
           } else if (event.type === 'progress') {
@@ -324,6 +371,27 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
               chips: event.item.chips || [],
             };
             receivedItems.push(menuItem);
+
+            // If appending to existing menu, update with merged items
+            if (appendToExisting && menuId) {
+              try {
+                const mergedItems = [...existingItems, ...receivedItems];
+                await supabase
+                  .from('menus')
+                  .update({ items: mergedItems })
+                  .eq('id', menuId);
+              } catch (err) {
+                console.error('Error updating menu with new items:', err);
+              }
+
+              // Send the item to the client
+              sendEvent('item', {
+                item: event.item,
+                category: event.category,
+                cartId: cartId,
+              });
+              return;
+            }
 
             // Create menu and cart on first item (if we have metadata)
             if (!cartId && metadata && receivedItems.length === 1) {
@@ -444,8 +512,8 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
         if (cartId && menuId) {
           sendEvent('status', { message: 'Finalizing menu...' });
 
-          // Make sure we have all items
-          const allItems = result.categories.flatMap((category) =>
+          // Make sure we have all items from this parse
+          const newItems = result.categories.flatMap((category) =>
             category.items.map((item) => ({
               category: category.category,
               name: item.name,
@@ -456,10 +524,13 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
             }))
           );
 
+          // If appending, merge with existing items; otherwise replace
+          const finalItems = appendToExisting ? [...existingItems, ...newItems] : newItems;
+
           // Final update with all items
           await supabase
             .from('menus')
-            .update({ items: allItems })
+            .update({ items: finalItems })
             .eq('id', menuId);
 
           sendEvent('complete', {

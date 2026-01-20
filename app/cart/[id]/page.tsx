@@ -71,6 +71,10 @@ export default function CartPage() {
   // Action bubble state
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
 
+  // Add menu page state
+  const addMenuPageInputRef = useRef<HTMLInputElement>(null);
+  const [isAddingMenuPage, setIsAddingMenuPage] = useState(false);
+
   // Swipe state
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
@@ -733,14 +737,25 @@ export default function CartPage() {
       try {
         const uploadData = JSON.parse(uploadDataStr);
 
-        // Convert base64 back to blob
-        const fileResponse = await fetch(uploadData.fileData);
-        const blob = await fileResponse.blob();
-        const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
-
         const formData = new FormData();
-        formData.append('file', file);
         formData.append('cartId', cartId);
+
+        // Handle both old format (single file) and new format (files array)
+        if (uploadData.files && Array.isArray(uploadData.files)) {
+          // New format: array of files
+          for (const fileInfo of uploadData.files) {
+            const fileResponse = await fetch(fileInfo.fileData);
+            const blob = await fileResponse.blob();
+            const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
+            formData.append('file', file);
+          }
+        } else if (uploadData.fileData) {
+          // Old format: single file (backwards compatibility)
+          const fileResponse = await fetch(uploadData.fileData);
+          const blob = await fileResponse.blob();
+          const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
+          formData.append('file', file);
+        }
 
         const headers: HeadersInit = {
           'Accept': 'text/event-stream',
@@ -999,6 +1014,105 @@ export default function CartPage() {
   // Handler for action bubble
   const handleToggleActionMenu = () => {
     setIsActionMenuOpen(!isActionMenuOpen);
+  };
+
+  // Handler for adding menu pages
+  const handleAddMenuPageClick = () => {
+    addMenuPageInputRef.current?.click();
+  };
+
+  const handleAddMenuPageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0 || !data?.menu.id) return;
+
+    const files: File[] = Array.from(fileList);
+
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+
+    // Validate files
+    for (const file of files) {
+      if (!validTypes.includes(file.type)) {
+        alert(`Invalid file type: ${file.name}. Please upload PDF or image files.`);
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File too large: ${file.name}. Maximum size is 10MB.`);
+        return;
+      }
+    }
+
+    setIsAddingMenuPage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('cartId', cartId);
+      formData.append('menuId', data.menu.id);
+      formData.append('appendToExisting', 'true');
+
+      for (const file of files) {
+        formData.append('file', file);
+      }
+
+      const response = await fetch('/api/parse-menu', {
+        method: 'POST',
+        headers: {
+          'Accept': 'text/event-stream',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to add menu page');
+      }
+
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('No response body');
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const eventData = JSON.parse(line.substring(6));
+
+            if (eventData.error) {
+              throw new Error(eventData.error);
+            }
+
+            // When complete or menu_extraction_end, refresh the cart data
+            if (eventData.complete || (eventData.type === 'menu_extraction_end' && eventData.status === 'complete')) {
+              const cartResponse = await fetch(`/api/cart/${cartId}`);
+              if (cartResponse.ok) {
+                const cartData = await cartResponse.json();
+                setData(cartData);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error adding menu page:', err);
+      alert(err instanceof Error ? err.message : 'Failed to add menu page');
+    } finally {
+      setIsAddingMenuPage(false);
+      // Reset input
+      if (addMenuPageInputRef.current) {
+        addMenuPageInputRef.current.value = '';
+      }
+    }
   };
 
   return (
@@ -1577,12 +1691,23 @@ export default function CartPage() {
         />
       )}
 
+      {/* Hidden file input for adding menu pages */}
+      <input
+        ref={addMenuPageInputRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/*"
+        onChange={handleAddMenuPageChange}
+        multiple
+        className="hidden"
+      />
+
       {/* Action Bubble, Search and Chat - only show on menu tab */}
       {data && activeTab === 'menu' && (
         <>
           <ActionBubble
             onChatClick={handleChatOpen}
             onSearchClick={handleSearchOpen}
+            onAddMenuPageClick={handleAddMenuPageClick}
             isMenuOpen={isActionMenuOpen}
             onToggleMenu={handleToggleActionMenu}
           />
