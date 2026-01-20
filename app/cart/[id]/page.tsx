@@ -743,12 +743,15 @@ export default function CartPage() {
         // Handle both old format (single file) and new format (files array)
         if (uploadData.files && Array.isArray(uploadData.files)) {
           // New format: array of files
+          console.log(`[DEBUG] Processing ${uploadData.files.length} files from sessionStorage`);
           for (const fileInfo of uploadData.files) {
+            console.log(`[DEBUG] Adding file: ${fileInfo.fileName} (${fileInfo.fileType})`);
             const fileResponse = await fetch(fileInfo.fileData);
             const blob = await fileResponse.blob();
             const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
             formData.append('file', file);
           }
+          console.log(`[DEBUG] FormData has ${formData.getAll('file').length} files`);
         } else if (uploadData.fileData) {
           // Old format: single file (backwards compatibility)
           const fileResponse = await fetch(uploadData.fileData);

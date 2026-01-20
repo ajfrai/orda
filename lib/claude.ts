@@ -475,10 +475,15 @@ CRITICAL:
 
     onProgress({ type: 'status', message: 'Sending to Claude AI...' });
 
+    // Increase max_tokens for multi-page menus (more content to extract)
+    const maxTokens = pageCount > 1 ? 8192 : 4096;
+
+    console.log(`[DEBUG] Sending ${pageCount} images to Claude with max_tokens=${maxTokens}`);
+
     // Call Claude API with streaming
     const stream = await anthropic.messages.stream({
       model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       messages: [
         {
           role: 'user',
