@@ -43,15 +43,42 @@ Every GitHub issue must have clear, verifiable acceptance criteria:
 - If acceptance criteria are unclear: Ask questions to clarify what "done" means
 - Review criteria before starting work
 
+## Closing Completed Issues
+
+**IMPORTANT**: Close GitHub issues immediately when their acceptance criteria are fully met.
+
+### When to Close an Issue
+
+After completing work on an issue:
+
+1. **Verify All Criteria Met**: Review the issue's acceptance criteria or "Expected Result" section
+2. **Test the Implementation**: Ensure the changes work as specified
+3. **Close Immediately**: Use the GitHub API to close the issue with state "closed"
+
+**Example workflow:**
+```bash
+# After pushing changes and verifying they work
+curl -X PATCH \
+  -H "Authorization: token $GHTOKEN" \
+  -H "Accept: application/vnd.github.v3+json" \
+  https://api.github.com/repos/{owner}/{repo}/issues/{number} \
+  -d '{"state":"closed"}'
+```
+
+### When NOT to Close
+
+- **Partial completion**: Document what's done and what remains, leave open
+- **Blocked**: Note blockers and dependencies, leave open
+- **Failed tests**: Keep open until issues are resolved
+- **Awaiting review**: Keep open until changes are reviewed and merged
+
 ## Project Wrap-Up
 
 During project wrap-up, review PLAN.md and GitHub issues:
 
-1. **Verify Acceptance Criteria**: Check each issue has clear, verifiable criteria (see standards above)
-2. **Close Completed Issues**: Match implementation against acceptance criteria
-   - If all criteria are met: Close the issue
-   - If partially complete: Document what's done and what remains
-   - If blocked: Note blockers and dependencies
+1. **Verify All Issues Closed**: Ensure completed work has corresponding closed issues
+2. **Review Open Issues**: Check if any should be closed based on completed work
+3. **Document Partial Work**: Update any partially complete issues with current status
 
 ## User Flow Documentation
 
