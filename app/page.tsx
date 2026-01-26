@@ -105,7 +105,25 @@ export default function Home() {
     try {
       setIsLoading(true);
 
-      // Create empty cart first
+      // Upload files to temporary storage first (bypasses sessionStorage size limits)
+      const formData = new FormData();
+      for (const file of selectedFiles) {
+        formData.append('file', file);
+      }
+
+      const uploadResponse = await fetch('/api/upload-temp', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Failed to upload files');
+      }
+
+      const { files: uploadedFiles } = await uploadResponse.json();
+
+      // Create empty cart
       const cartResponse = await fetch('/api/cart/create', {
         method: 'POST',
       });
@@ -116,27 +134,10 @@ export default function Home() {
 
       const { cartId } = await cartResponse.json();
 
-      // Convert all files to base64 for sessionStorage
-      const fileDataPromises = selectedFiles.map((file) => {
-        return new Promise<{ fileName: string; fileType: string; fileData: string }>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            resolve({
-              fileName: file.name,
-              fileType: file.type,
-              fileData: reader.result as string,
-            });
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      });
-
-      const filesData = await Promise.all(fileDataPromises);
-
+      // Store URLs in sessionStorage (much smaller than base64 data)
       sessionStorage.setItem('menuUpload', JSON.stringify({
         mode: 'upload',
-        files: filesData,
+        files: uploadedFiles, // Contains { fileName, fileType, url } for each file
       }));
 
       // Redirect to cart page with streaming enabled
@@ -144,7 +145,13 @@ export default function Home() {
     } catch (error) {
       console.error('[DEBUG] Error preparing upload:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
-      setErrorDetails(`Failed to prepare upload: ${errorMessage}`);
+
+      // Provide clearer error message for common issues
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('network')) {
+        setErrorDetails('Network error. Please check your connection and try again.');
+      } else {
+        setErrorDetails(`Failed to prepare upload: ${errorMessage}`);
+      }
       setIsLoading(false);
     }
   };

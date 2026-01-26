@@ -726,8 +726,8 @@ export default function CartPage() {
           return;
         }
 
-        // Otherwise show error
-        setError('No upload data found. Please try uploading your menu again from the home page.');
+        // Otherwise show error with helpful message
+        setError('Your upload session has expired. Please go back to the home page and upload your menu again.');
         setLoading(false);
         return;
       }
@@ -740,20 +740,34 @@ export default function CartPage() {
         const formData = new FormData();
         formData.append('cartId', cartId);
 
-        // Handle both old format (single file) and new format (files array)
+        // Handle different formats: URL-based (new), base64-based (legacy), or single file (oldest)
         if (uploadData.files && Array.isArray(uploadData.files)) {
-          // New format: array of files
           console.log(`[DEBUG] Processing ${uploadData.files.length} files from sessionStorage`);
+
           for (const fileInfo of uploadData.files) {
-            console.log(`[DEBUG] Adding file: ${fileInfo.fileName} (${fileInfo.fileType})`);
-            const fileResponse = await fetch(fileInfo.fileData);
-            const blob = await fileResponse.blob();
-            const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
-            formData.append('file', file);
+            // Check if this is URL-based (new format) or base64-based (legacy format)
+            if (fileInfo.url) {
+              // New format: URL-based - fetch from Supabase storage
+              console.log(`[DEBUG] Fetching file from URL: ${fileInfo.fileName}`);
+              const fileResponse = await fetch(fileInfo.url);
+              if (!fileResponse.ok) {
+                throw new Error(`Failed to fetch uploaded file: ${fileInfo.fileName}`);
+              }
+              const blob = await fileResponse.blob();
+              const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
+              formData.append('file', file);
+            } else if (fileInfo.fileData) {
+              // Legacy format: base64 data URL
+              console.log(`[DEBUG] Adding file from base64: ${fileInfo.fileName} (${fileInfo.fileType})`);
+              const fileResponse = await fetch(fileInfo.fileData);
+              const blob = await fileResponse.blob();
+              const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
+              formData.append('file', file);
+            }
           }
           console.log(`[DEBUG] FormData has ${formData.getAll('file').length} files`);
         } else if (uploadData.fileData) {
-          // Old format: single file (backwards compatibility)
+          // Oldest format: single file (backwards compatibility)
           const fileResponse = await fetch(uploadData.fileData);
           const blob = await fileResponse.blob();
           const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
@@ -859,7 +873,15 @@ export default function CartPage() {
       } catch (err) {
         console.error('[DEBUG] Error parsing menu:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        setError(errorMessage);
+
+        // Provide user-friendly error messages
+        if (errorMessage.includes('Failed to fetch uploaded file')) {
+          setError('Unable to retrieve your uploaded images. Please try uploading again from the home page.');
+        } else if (errorMessage.includes('network') || errorMessage.includes('Failed to fetch')) {
+          setError('Network error while processing your menu. Please check your connection and try again.');
+        } else {
+          setError(errorMessage);
+        }
       }
     }
 
