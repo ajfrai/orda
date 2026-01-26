@@ -105,51 +105,59 @@ export default function Home() {
     try {
       setIsLoading(true);
 
-      // Upload files to temporary storage first (bypasses sessionStorage size limits)
-      let formData: FormData;
-      try {
-        formData = new FormData();
-        for (const file of selectedFiles) {
-          console.log(`[DEBUG] Adding file to FormData: ${file.name} (${file.type}, ${file.size} bytes)`);
-          formData.append('file', file);
-        }
-      } catch (formDataError) {
-        console.error('[DEBUG] Error creating FormData:', formDataError);
-        throw new Error('Failed to prepare files for upload. Try reducing image size or using JPEG format.');
+      // Step 1: Get signed upload URLs from our API (just sends metadata, not files)
+      const fileMetadata = selectedFiles.map((file) => ({
+        fileName: file.name,
+        fileType: file.type,
+      }));
+
+      console.log('[DEBUG] Requesting signed upload URLs...');
+      const signedUrlResponse = await fetch('/api/upload-temp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: fileMetadata }),
+      });
+
+      if (!signedUrlResponse.ok) {
+        const errorData = await signedUrlResponse.json();
+        throw new Error(errorData.error || 'Failed to prepare upload');
       }
 
-      console.log('[DEBUG] Sending upload request...');
-      let uploadResponse: Response;
-      try {
-        uploadResponse = await fetch('/api/upload-temp', {
-          method: 'POST',
-          body: formData,
+      const { signedUrls } = await signedUrlResponse.json();
+
+      // Step 2: Upload each file directly to Supabase using signed URLs
+      // This bypasses Vercel's 4.5MB body limit since files go direct to storage
+      const uploadedFiles: Array<{ fileName: string; fileType: string; url: string }> = [];
+
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const urlInfo = signedUrls[i];
+
+        console.log(`[DEBUG] Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB) directly to storage...`);
+
+        const uploadResponse = await fetch(urlInfo.uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type,
+          },
+          body: file,
         });
-      } catch (fetchError) {
-        console.error('[DEBUG] Fetch error:', fetchError);
-        throw new Error('Network error while uploading. Please check your connection.');
+
+        if (!uploadResponse.ok) {
+          console.error('[DEBUG] Direct upload failed:', uploadResponse.status);
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        uploadedFiles.push({
+          fileName: urlInfo.fileName,
+          fileType: urlInfo.fileType,
+          url: urlInfo.publicUrl,
+        });
+
+        console.log(`[DEBUG] Successfully uploaded ${file.name}`);
       }
 
-      const responseText = await uploadResponse.text();
-      console.log('[DEBUG] Upload response status:', uploadResponse.status);
-
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('[DEBUG] Failed to parse response:', responseText);
-        throw new Error('Invalid response from server');
-      }
-
-      if (!uploadResponse.ok) {
-        throw new Error(responseData.error || `Upload failed with status ${uploadResponse.status}`);
-      }
-
-      const uploadedFiles = responseData.files;
-      if (!uploadedFiles || uploadedFiles.length === 0) {
-        throw new Error('No files were uploaded');
-      }
-      console.log('[DEBUG] Upload successful:', uploadedFiles.length, 'files');
+      console.log('[DEBUG] All files uploaded successfully:', uploadedFiles.length);
 
       // Create empty cart
       const cartResponse = await fetch('/api/cart/create', {
