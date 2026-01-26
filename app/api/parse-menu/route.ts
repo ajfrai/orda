@@ -242,8 +242,9 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        let fileData: FileData;
         let existingCartId: string | null = null;
+        let appendToExisting = false;
+        let existingMenuId: string | null = null;
 
         // Helper to send SSE message
         const sendEvent = (event: string, data: any) => {
@@ -251,68 +252,130 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           controller.enqueue(encoder.encode(message));
         };
 
-        // Handle file upload - supports single file or multiple files
-        const formData = await request.formData();
-        const files = formData.getAll('file') as File[];
-        existingCartId = formData.get('cartId') as string | null;
-        const appendToExisting = formData.get('appendToExisting') === 'true';
-        const existingMenuId = formData.get('menuId') as string | null;
-
-        console.log(`[DEBUG] API received ${files.length} files`);
-        files.forEach((f, i) => console.log(`[DEBUG] File ${i}: ${f.name} (${f.type}, ${f.size} bytes)`));
-
-        if (!files || files.length === 0) {
-          sendEvent('error', { error: 'No file provided' });
-          controller.close();
-          return;
-        }
-
-        // Validate all files
         const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         const maxFiles = 6;
 
-        if (files.length > maxFiles) {
-          sendEvent('error', { error: `Too many files. Maximum ${maxFiles} pages allowed.` });
-          controller.close();
-          return;
-        }
-
-        for (const file of files) {
-          if (!validTypes.includes(file.type)) {
-            sendEvent('error', { error: `Invalid file type: ${file.name}. Please upload PDF or image files.` });
-            controller.close();
-            return;
-          }
-
-          if (file.size > 10 * 1024 * 1024) {
-            sendEvent('error', { error: `File too large: ${file.name}. Maximum size is 10MB per file.` });
-            controller.close();
-            return;
-          }
-        }
-
-        // Convert all files to FileData array and upload all to storage
         const filesData: FileData[] = [];
         const uploadedUrls: string[] = [];
 
-        sendEvent('status', { message: `Uploading ${files.length} menu ${files.length === 1 ? 'file' : 'files'}...` });
+        // Check if this is a JSON request with file URLs (new format)
+        // or a FormData request with actual files (legacy format)
+        if (contentType.includes('application/json')) {
+          // New format: JSON with file URLs - fetch files directly from Supabase
+          const body = await request.json();
+          const { cartId, fileUrls, menuId, append } = body as {
+            cartId?: string;
+            fileUrls?: Array<{ fileName: string; fileType: string; url: string }>;
+            menuId?: string;
+            append?: boolean;
+          };
 
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          const arrayBuffer = await file.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
+          existingCartId = cartId || null;
+          existingMenuId = menuId || null;
+          appendToExisting = append === true;
 
-          // Upload all files to storage (for "view original" feature)
-          const url = await uploadFileToStorage(buffer, file.name, file.type);
-          if (url) {
-            uploadedUrls.push(url);
+          if (!fileUrls || fileUrls.length === 0) {
+            sendEvent('error', { error: 'No file URLs provided' });
+            controller.close();
+            return;
           }
 
-          filesData.push({
-            base64: buffer.toString('base64'),
-            mediaType: file.type,
-            isDocument: file.type === 'application/pdf',
-          });
+          if (fileUrls.length > maxFiles) {
+            sendEvent('error', { error: `Too many files. Maximum ${maxFiles} pages allowed.` });
+            controller.close();
+            return;
+          }
+
+          sendEvent('status', { message: `Fetching ${fileUrls.length} menu ${fileUrls.length === 1 ? 'file' : 'files'}...` });
+
+          // Fetch each file from its URL
+          for (const fileInfo of fileUrls) {
+            if (!validTypes.includes(fileInfo.fileType)) {
+              sendEvent('error', { error: `Invalid file type: ${fileInfo.fileName}` });
+              controller.close();
+              return;
+            }
+
+            console.log(`[DEBUG] Fetching file from URL: ${fileInfo.fileName}`);
+            const fileResponse = await fetch(fileInfo.url);
+
+            if (!fileResponse.ok) {
+              console.error(`[DEBUG] Failed to fetch ${fileInfo.fileName}:`, fileResponse.status);
+              sendEvent('error', { error: `Failed to fetch ${fileInfo.fileName}` });
+              controller.close();
+              return;
+            }
+
+            const arrayBuffer = await fileResponse.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            // File is already in storage, just record the URL
+            uploadedUrls.push(fileInfo.url);
+
+            filesData.push({
+              base64: buffer.toString('base64'),
+              mediaType: fileInfo.fileType,
+              isDocument: fileInfo.fileType === 'application/pdf',
+            });
+
+            console.log(`[DEBUG] Fetched ${fileInfo.fileName} (${buffer.length} bytes)`);
+          }
+        } else {
+          // Legacy format: FormData with actual files
+          const formData = await request.formData();
+          const files = formData.getAll('file') as File[];
+          existingCartId = formData.get('cartId') as string | null;
+          appendToExisting = formData.get('appendToExisting') === 'true';
+          existingMenuId = formData.get('menuId') as string | null;
+
+          console.log(`[DEBUG] API received ${files.length} files via FormData`);
+          files.forEach((f, i) => console.log(`[DEBUG] File ${i}: ${f.name} (${f.type}, ${f.size} bytes)`));
+
+          if (!files || files.length === 0) {
+            sendEvent('error', { error: 'No file provided' });
+            controller.close();
+            return;
+          }
+
+          if (files.length > maxFiles) {
+            sendEvent('error', { error: `Too many files. Maximum ${maxFiles} pages allowed.` });
+            controller.close();
+            return;
+          }
+
+          for (const file of files) {
+            if (!validTypes.includes(file.type)) {
+              sendEvent('error', { error: `Invalid file type: ${file.name}. Please upload PDF or image files.` });
+              controller.close();
+              return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+              sendEvent('error', { error: `File too large: ${file.name}. Maximum size is 10MB per file.` });
+              controller.close();
+              return;
+            }
+          }
+
+          sendEvent('status', { message: `Uploading ${files.length} menu ${files.length === 1 ? 'file' : 'files'}...` });
+
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            // Upload all files to storage (for "view original" feature)
+            const url = await uploadFileToStorage(buffer, file.name, file.type);
+            if (url) {
+              uploadedUrls.push(url);
+            }
+
+            filesData.push({
+              base64: buffer.toString('base64'),
+              mediaType: file.type,
+              isDocument: file.type === 'application/pdf',
+            });
+          }
         }
 
         // Store as JSON array if multiple files, single URL string if one file
