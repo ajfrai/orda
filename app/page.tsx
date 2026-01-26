@@ -106,22 +106,50 @@ export default function Home() {
       setIsLoading(true);
 
       // Upload files to temporary storage first (bypasses sessionStorage size limits)
-      const formData = new FormData();
-      for (const file of selectedFiles) {
-        formData.append('file', file);
+      let formData: FormData;
+      try {
+        formData = new FormData();
+        for (const file of selectedFiles) {
+          console.log(`[DEBUG] Adding file to FormData: ${file.name} (${file.type}, ${file.size} bytes)`);
+          formData.append('file', file);
+        }
+      } catch (formDataError) {
+        console.error('[DEBUG] Error creating FormData:', formDataError);
+        throw new Error('Failed to prepare files for upload. Try reducing image size or using JPEG format.');
       }
 
-      const uploadResponse = await fetch('/api/upload-temp', {
-        method: 'POST',
-        body: formData,
-      });
+      console.log('[DEBUG] Sending upload request...');
+      let uploadResponse: Response;
+      try {
+        uploadResponse = await fetch('/api/upload-temp', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch (fetchError) {
+        console.error('[DEBUG] Fetch error:', fetchError);
+        throw new Error('Network error while uploading. Please check your connection.');
+      }
+
+      const responseText = await uploadResponse.text();
+      console.log('[DEBUG] Upload response status:', uploadResponse.status);
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('[DEBUG] Failed to parse response:', responseText);
+        throw new Error('Invalid response from server');
+      }
 
       if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload files');
+        throw new Error(responseData.error || `Upload failed with status ${uploadResponse.status}`);
       }
 
-      const { files: uploadedFiles } = await uploadResponse.json();
+      const uploadedFiles = responseData.files;
+      if (!uploadedFiles || uploadedFiles.length === 0) {
+        throw new Error('No files were uploaded');
+      }
+      console.log('[DEBUG] Upload successful:', uploadedFiles.length, 'files');
 
       // Create empty cart
       const cartResponse = await fetch('/api/cart/create', {
