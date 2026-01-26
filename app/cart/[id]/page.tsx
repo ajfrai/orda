@@ -737,57 +737,64 @@ export default function CartPage() {
       try {
         const uploadData = JSON.parse(uploadDataStr);
 
-        const formData = new FormData();
-        formData.append('cartId', cartId);
+        // Check if we have URL-based files (new format) - send URLs directly to API
+        // This avoids the 4.5MB Vercel body limit since API fetches from Supabase directly
+        const hasUrlBasedFiles = uploadData.files?.some((f: { url?: string }) => f.url);
 
-        // Handle different formats: URL-based (new), base64-based (legacy), or single file (oldest)
-        if (uploadData.files && Array.isArray(uploadData.files)) {
-          console.log(`[DEBUG] Processing ${uploadData.files.length} files from sessionStorage`);
+        let response: Response;
 
-          for (const fileInfo of uploadData.files) {
-            // Check if this is URL-based (new format) or base64-based (legacy format)
-            if (fileInfo.url) {
-              // New format: URL-based - fetch from Supabase storage
-              console.log(`[DEBUG] Fetching file from URL: ${fileInfo.fileName}`);
-              const fileResponse = await fetch(fileInfo.url);
-              if (!fileResponse.ok) {
-                throw new Error(`Failed to fetch uploaded file: ${fileInfo.fileName}`);
+        if (hasUrlBasedFiles) {
+          // New format: Send file URLs to API, let it fetch directly from Supabase
+          console.log(`[DEBUG] Sending ${uploadData.files.length} file URLs to parse-menu`);
+
+          // Transition to parsing phase
+          setProgressStage('parsing');
+
+          response = await fetch('/api/parse-menu', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream',
+            },
+            body: JSON.stringify({
+              cartId,
+              fileUrls: uploadData.files, // Contains { fileName, fileType, url }
+            }),
+          });
+        } else {
+          // Legacy format: base64 data - use FormData (for backwards compatibility)
+          const formData = new FormData();
+          formData.append('cartId', cartId);
+
+          if (uploadData.files && Array.isArray(uploadData.files)) {
+            console.log(`[DEBUG] Processing ${uploadData.files.length} legacy files`);
+
+            for (const fileInfo of uploadData.files) {
+              if (fileInfo.fileData) {
+                console.log(`[DEBUG] Adding file from base64: ${fileInfo.fileName}`);
+                const fileResponse = await fetch(fileInfo.fileData);
+                const blob = await fileResponse.blob();
+                const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
+                formData.append('file', file);
               }
-              const blob = await fileResponse.blob();
-              const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
-              formData.append('file', file);
-            } else if (fileInfo.fileData) {
-              // Legacy format: base64 data URL
-              console.log(`[DEBUG] Adding file from base64: ${fileInfo.fileName} (${fileInfo.fileType})`);
-              const fileResponse = await fetch(fileInfo.fileData);
-              const blob = await fileResponse.blob();
-              const file = new File([blob], fileInfo.fileName, { type: fileInfo.fileType });
-              formData.append('file', file);
             }
+          } else if (uploadData.fileData) {
+            // Oldest format: single file
+            const fileResponse = await fetch(uploadData.fileData);
+            const blob = await fileResponse.blob();
+            const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
+            formData.append('file', file);
           }
-          console.log(`[DEBUG] FormData has ${formData.getAll('file').length} files`);
-        } else if (uploadData.fileData) {
-          // Oldest format: single file (backwards compatibility)
-          const fileResponse = await fetch(uploadData.fileData);
-          const blob = await fileResponse.blob();
-          const file = new File([blob], uploadData.fileName, { type: uploadData.fileType });
-          formData.append('file', file);
+
+          console.log('[DEBUG] Starting parse-menu streaming (legacy format)');
+          setProgressStage('parsing');
+
+          response = await fetch('/api/parse-menu', {
+            method: 'POST',
+            headers: { 'Accept': 'text/event-stream' },
+            body: formData,
+          });
         }
-
-        const headers: HeadersInit = {
-          'Accept': 'text/event-stream',
-        };
-
-        console.log('[DEBUG] Starting parse-menu streaming');
-
-        // Transition from setup to parsing phase
-        setProgressStage('parsing');
-
-        const response = await fetch('/api/parse-menu', {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -1069,21 +1076,62 @@ export default function CartPage() {
     setIsAddingMenuPage(true);
 
     try {
-      const formData = new FormData();
-      formData.append('cartId', cartId);
-      formData.append('menuId', data.menu.id);
-      formData.append('appendToExisting', 'true');
+      // Step 1: Get signed upload URLs (bypasses Vercel's 4.5MB body limit)
+      const fileMetadata = files.map((file) => ({
+        fileName: file.name,
+        fileType: file.type,
+      }));
 
-      for (const file of files) {
-        formData.append('file', file);
+      const signedUrlResponse = await fetch('/api/upload-temp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: fileMetadata }),
+      });
+
+      if (!signedUrlResponse.ok) {
+        const errorData = await signedUrlResponse.json();
+        throw new Error(errorData.error || 'Failed to prepare upload');
       }
 
+      const { signedUrls } = await signedUrlResponse.json();
+
+      // Step 2: Upload each file directly to Supabase
+      const uploadedFiles: Array<{ fileName: string; fileType: string; url: string }> = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const urlInfo = signedUrls[i];
+
+        const uploadResponse = await fetch(urlInfo.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+
+        uploadedFiles.push({
+          fileName: urlInfo.fileName,
+          fileType: urlInfo.fileType,
+          url: urlInfo.publicUrl,
+        });
+      }
+
+      // Step 3: Send URLs to parse-menu API
       const response = await fetch('/api/parse-menu', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
         },
-        body: formData,
+        body: JSON.stringify({
+          cartId,
+          menuId: data.menu.id,
+          fileUrls: uploadedFiles,
+          append: true,
+        }),
       });
 
       if (!response.ok) {
