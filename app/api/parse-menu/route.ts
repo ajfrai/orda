@@ -7,11 +7,84 @@ import { NextRequest, NextResponse } from 'next/server';
 import { analyzeMenuFromUpload, analyzeMenuWithProgress, type ProgressEvent } from '@/lib/claude';
 import { getServiceRoleClient } from '@/lib/supabase';
 import type { ParseMenuResponse } from '@/types';
+import sharp from 'sharp';
 
 interface FileData {
   base64: string;
   mediaType: string;
   isDocument: boolean;
+}
+
+// Claude API has a 5MB limit per image (before base64 encoding, base64 adds ~33%)
+// So we target ~3.5MB to be safe after base64 encoding
+const CLAUDE_IMAGE_LIMIT = 3.5 * 1024 * 1024;
+
+/**
+ * Compress image if it exceeds Claude's size limit
+ * Converts to JPEG and reduces quality/dimensions as needed
+ */
+async function compressImageForClaude(buffer: Buffer, mimeType: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  // PDFs don't need compression here (handled differently by Claude)
+  if (mimeType === 'application/pdf') {
+    return { buffer, mimeType };
+  }
+
+  // If already under limit, no compression needed
+  if (buffer.length <= CLAUDE_IMAGE_LIMIT) {
+    return { buffer, mimeType };
+  }
+
+  console.log(`[DEBUG] Image too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB), compressing...`);
+
+  try {
+    // Get image metadata
+    const metadata = await sharp(buffer).metadata();
+    const { width = 4000, height = 4000 } = metadata;
+
+    // Start with high quality and reduce if needed
+    let quality = 85;
+    let maxDimension = Math.max(width, height);
+    let compressedBuffer: Buffer = buffer;
+
+    // Try progressively more aggressive compression
+    while (compressedBuffer.length > CLAUDE_IMAGE_LIMIT && quality >= 30) {
+      // Resize if very large
+      const resizeOptions = maxDimension > 3000 ? {
+        width: Math.round(width * (3000 / maxDimension)),
+        height: Math.round(height * (3000 / maxDimension)),
+        fit: 'inside' as const,
+      } : undefined;
+
+      compressedBuffer = await sharp(buffer)
+        .resize(resizeOptions)
+        .jpeg({ quality, mozjpeg: true })
+        .toBuffer();
+
+      console.log(`[DEBUG] Compressed to ${(compressedBuffer.length / 1024 / 1024).toFixed(2)}MB (quality=${quality})`);
+
+      quality -= 10;
+      maxDimension = 2500; // More aggressive resize on next iteration
+    }
+
+    // If still too large after all compression attempts, throw helpful error
+    if (compressedBuffer.length > CLAUDE_IMAGE_LIMIT) {
+      throw new Error(
+        `Image is too large to process even after compression (${(compressedBuffer.length / 1024 / 1024).toFixed(1)}MB). ` +
+        `Please try: (1) Converting to PDF format, (2) Taking a photo from further away, ` +
+        `(3) Using your phone's "High Efficiency" photo format, or (4) Cropping the image to show just the menu.`
+      );
+    }
+
+    return { buffer: compressedBuffer, mimeType: 'image/jpeg' };
+  } catch (error) {
+    // Re-throw our custom error
+    if (error instanceof Error && error.message.includes('too large to process')) {
+      throw error;
+    }
+    console.error('[DEBUG] Image compression failed:', error);
+    // Return original if compression fails for other reasons
+    return { buffer, mimeType };
+  }
 }
 
 /**
@@ -93,14 +166,20 @@ export async function POST(request: NextRequest) {
 
     // Convert to buffer
     const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    let buffer: Buffer = Buffer.from(arrayBuffer);
+    let mimeType = file.type;
 
-    // Upload file to storage
+    // Upload original file to storage
     console.log('Uploading file to storage:', file.name, file.type);
     const pdfUrl = await uploadFileToStorage(buffer, file.name, file.type);
 
-    console.log('Analyzing uploaded file:', file.name, file.type);
-    const analysis = await analyzeMenuFromUpload(buffer, file.type);
+    // Compress image if it exceeds Claude's limit
+    const compressed = await compressImageForClaude(buffer, mimeType);
+    buffer = compressed.buffer;
+    mimeType = compressed.mimeType;
+
+    console.log('Analyzing uploaded file:', file.name, mimeType);
+    const analysis = await analyzeMenuFromUpload(buffer, mimeType);
 
     // Check if it's a valid menu
     if (!analysis.isMenu) {
@@ -307,18 +386,24 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
             }
 
             const arrayBuffer = await fileResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+            let buffer: Buffer = Buffer.from(arrayBuffer);
+            let mediaType = fileInfo.fileType;
+
+            // Compress image if it exceeds Claude's limit
+            const compressed = await compressImageForClaude(buffer, mediaType);
+            buffer = compressed.buffer;
+            mediaType = compressed.mimeType;
 
             // File is already in storage, just record the URL
             uploadedUrls.push(fileInfo.url);
 
             filesData.push({
               base64: buffer.toString('base64'),
-              mediaType: fileInfo.fileType,
+              mediaType: mediaType,
               isDocument: fileInfo.fileType === 'application/pdf',
             });
 
-            console.log(`[DEBUG] Fetched ${fileInfo.fileName} (${buffer.length} bytes)`);
+            console.log(`[DEBUG] Fetched ${fileInfo.fileName} (${buffer.length} bytes, type=${mediaType})`);
           }
         } else {
           // Legacy format: FormData with actual files
@@ -362,17 +447,23 @@ async function handleStreamingRequest(request: NextRequest, contentType: string)
           for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const arrayBuffer = await file.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+            let buffer: Buffer = Buffer.from(arrayBuffer);
+            let mediaType = file.type;
 
-            // Upload all files to storage (for "view original" feature)
+            // Upload original file to storage (for "view original" feature)
             const url = await uploadFileToStorage(buffer, file.name, file.type);
             if (url) {
               uploadedUrls.push(url);
             }
 
+            // Compress image if it exceeds Claude's limit
+            const compressed = await compressImageForClaude(buffer, mediaType);
+            buffer = compressed.buffer;
+            mediaType = compressed.mimeType;
+
             filesData.push({
               base64: buffer.toString('base64'),
-              mediaType: file.type,
+              mediaType: mediaType,
               isDocument: file.type === 'application/pdf',
             });
           }
